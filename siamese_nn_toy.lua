@@ -10,9 +10,11 @@
 -- outputFile=./tests/$label\_$chromSel-$chrStart_locus-$chrEnd_locus\_negPerc$negativeElementsPerc\_trainPerc$trainSamplesPerc\_tuples$tupleLimit
 -- qsub -q hoffmangroup -N siamese_nn_toy -cwd -b y -o ./$outputFile -e ./$outputFile th siamese_nn_toy.lua $label $tupleLimit $chromSel $chrStart_locus $chrEnd_locus $negativeElementsPerc $trainSamplesPerc $outputFile
 
-SAVE_MSE_VECTOR_TO_FILE = true
+-- SAVE_MSE_VECTOR_TO_FILE = true
 
-VERBOSE = false
+L2_WEIGHT = 0.000001;
+REGULARIZATION = false;
+
 PERMUTATION_TRAIN = false
 PERMUTATION_TEST = true
 MINIBATCH_SPAN_NUMBER = 10
@@ -33,25 +35,8 @@ local globalArrayFPindices = {}
 local globalArrayFPvalues = {}
 globalMinFPplusFN_vector = {}
 
-function string:split(sep)
-        local sep, fields = sep or ":", {}
-        local pattern = string.format("([^%s]+)", sep)
-        self:gsub(pattern, function(c) fields[#fields+1] = c end)
-        return fields
-end
 
--- Function that reads a value and returns the string of the signed value
-function signedValueFunction(value)
-  
-      local value = tonumber(value);
-      --print("value = "..value);
-      local charPlus = ""
-      if tonumber(value) >= 0 then charPlus = "+"; end
-      local outputString = charPlus..""..tostring(round(value,2));
-      --print("outputString = "..outputString);
-      
-      return tostring(outputString);
-end
+
 
 
 -- function that checks the stop condition for each iteration
@@ -64,10 +49,14 @@ function continueOrStopCheck(applicationOutput)
 
 	if lastMCC >= SUFFICIENT_MCC then 
 	    saveModelToFile(generalPerceptron, chromSel, chrStart_locus, chrEnd_locus, trainedModelFile); 
+	    
+	    print("lastMCC ("..signedValueFunction(lastMCC)..") >= SUFFICIENT_MCC ("..signedValueFunction(SUFFICIENT_MCC)..") then break");
 	    stopConditionFlag = true;
 
 	elseif lastMCC==-2 and lastAccuracy >= SUFFICIENT_ACCURACY then 
 	    saveModelToFile(generalPerceptron, chromSel, chrStart_locus, chrEnd_locus, trainedModelFile); 
+	    
+	    print("lastAccuracy ("..signedValueFunction(lastAccuracy)..") >= SUFFICIENT_ACCURACY ("..signedValueFunction(SUFFICIENT_ACCURACY)..") then break");
 	    stopConditionFlag = true;
 	end    
 
@@ -218,8 +207,8 @@ function siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrai
 
 	    local thisAccuracy = round(testModelOutput[1],2);
 	    local thisMCC = signedValueFunction(round(testModelOutput[3],2));
-	    if thisMCC == -2 then thisMCC="Not"; end
-	    if thisAccuracy == -2 then thisAccuracy="Not"; end
+	    if tonumber(thisMCC) < -1 then thisMCC="Not"; end
+	    if thisAccuracy < -1 then thisAccuracy="Not"; end
 	    architectureLabel = architectureLabel.."_Mcc"..tostring(thisMCC).."_accuracy"..tostring(thisAccuracy);
 	    architectureLabel = architectureLabel.."_lastMse"..tostring(round(lastMseError,2)).."perc";
 	    
@@ -332,6 +321,8 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	local completionRate = 0
 	local loopIterations = 1
 	local trainIndexVect = {}; for i=1, #first_datasetTrain do trainIndexVect[i] = i;  end
+	
+	print("#trainIndexVect = "..#trainIndexVect);
 
 	local permutedTrainIndexVect = {};
 	if PERMUTATION_TRAIN == true then
@@ -361,7 +352,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	      end
 	       
 	      completionRate = loopIterations*100/(iterations_number*#first_datasetTrain);
-	      if ite%PRINT_NUMBER==0 then
+	      if (completionRate*10)%10==0 and VERBOSE==false then
 		io.write(round(completionRate,2).."% "); io.flush();
 		printPercCount = printPercCount+1
 		if printPercCount%10==0 then io.write("\n"); io.flush(); end
@@ -374,7 +365,13 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	    if tonumber(targetDatasetTrain[currentIndex][1]) == 0 
 	    then currentTarget = -1;  end
 	    
-	    generalPerceptron = gradientUpdate(generalPerceptron, trainDataset[i], currentTarget, learnRate, i, ite);    
+	    if REGULARIZATION == false then
+	      generalPerceptron = gradientUpdate(generalPerceptron, trainDataset[i], currentTarget, learnRate, i, ite);    
+	    else
+	      if ite==1 and i==1 then print("REGULARIZATION == true, L2_WEIGHT = "..L2_WEIGHT); end
+	      generalPerceptron = gradientUpdateReg(generalPerceptron, trainDataset[i], currentTarget, learnRate, L2_WEIGHT, i, ite);    
+	    end
+	    
 
 	    local predicted = generalPerceptron:forward(trainDataset[i])[1];  
 	    -- print("predicted = "..predicted);
@@ -419,7 +416,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		for m=1, MINIBATCH_SPAN_NUMBER do  
 		    
 		    completionRate = loopIterations*100/(iterations_number*MINIBATCH_SPAN_NUMBER);
-		    if ite%PRINT_NUMBER==0 then
+		    if (completionRate*10)%10==0 then
 		      io.write(round(completionRate,2).."% "); io.flush();
 		      printPercCount = printPercCount+1
 		      if printPercCount%10==0 then io.write("\n"); io.flush(); end
@@ -498,9 +495,9 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     globalArrayFPindices = output_confusion_matrix[2];
     globalArrayFPvalues = output_confusion_matrix[3];
     local lastMCC = output_confusion_matrix[4];
-    if lastMCC ~=-2 then print("lastMCC = ".. lastMCC); end
-    if lastAccuracy ~= -2 then print("lastAccuracy = "..lastAccuracy); end
-
+   --  if lastMCC ~=-2 then print("lastMCC = ".. signedValueFunction(lastMCC)); end
+   --  if lastAccuracy ~= -2 then print("lastAccuracy = "..lastAccuracy); end
+    
     return {lastAccuracy, predictionTestVect, lastMCC, truthVect};
   
 end
@@ -679,9 +676,11 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
    local target_array_tensors = changeSignOfArray(targetVector)  
    local gradientWrtOutput = torch.Tensor(target_array_tensors)
      
-   local predictionValue = generalPerceptron:forward(dataset_vector)[1];
+   local predictionValue = generalPerceptron:forward(dataset_vector);
    --print("gradientUpdateMinibatch() predictionValue = "..round(predictionValue,4));
 
+   
+   predictionValue = predictionValue[1];
    generalPerceptron:zeroGradParameters();
    generalPerceptron:backward(dataset_vector, gradientWrtOutput);
    generalPerceptron:updateParameters(learningRate);
@@ -689,64 +688,96 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
   return generalPerceptron;
 end
 
+VERBOSE = false
 
+-- Gradient update for the siamese neural network with regularization
+function gradientUpdateReg(generalPerceptron, input_profile, targetValue, learningRate, l2_weight, i, ite)
+
+   function input_profile:size() return #input_profile end
+   local predictionValue = generalPerceptron:forward(input_profile)[1]
+
+   local regPenalty = 0  -- Regularization error
+
+    if predictionValue*targetValue < 1 then
+      gradientWrtOutput = torch.Tensor({-targetValue})
+      generalPerceptron:zeroGradParameters();
+      generalPerceptron:backward(input_profile, gradientWrtOutput)
+      generalPerceptron:updateParameters(learningRate)
+      local parameters, _ = generalPerceptron:parameters()
+     
+      for i=1, table.getn(parameters) do
+        parameters[i]:mul(1-l2_weight)  -- updating parameters with L2 regularization
+        regPenalty = regPenalty + l2_weight * parameters[i]:norm(2) -- updating regularization error
+      end
+    end
+
+    local meanSquareError = math.pow(targetValue - predictionValue,2)
+    local totalError = meanSquareError + regPenalty -- total_error = data_error + regularization_penalty
+  
+    
+    if i%50==0 and ite%20==0 and VERBOSE==true  then
+      io.write("(ite="..ite..") (ele="..i..") pred = "..signedValueFunction(predictionValue).." target = "..signedValueFunction(targetValue));
+      io.write(" => totalError = "..round(totalError,3).." = "..round(meanSquareError,3).." + "..round(regPenalty,3));
+      
+      io.write("\n");
+	  io.flush();
+    end
+    
+    count = ite*DATA_SIZE+i;
+    mseSum = mseSum + totalError;
+	    
+    -- it's 50 because the error goes from 0 to 4
+    mseSumRate = mseSum*100/(count*MAX_POSSIBLE_MSE)
+    rateVector[#rateVector+1] = mseSumRate; 
+    rateIndexVector[#rateIndexVector+1] = count;  
+        	    
+    if i%50==0 and ite%20==0 and VERBOSE==true then
+	  io.write("(ite="..ite..") (ele="..i..") mseSumRate = (mseSum + totalError)*100/"..count.." = "..round(mseSumRate,2).."%\n");
+    end
+    
+    return generalPerceptron  
+end
 
 
 -- Gradient update for the siamese neural network
-function gradientUpdate(generalPerceptron, dataset_vector, targetValue, learningRate, i, ite)
+function gradientUpdate(generalPerceptron, input_profile, targetValue, learningRate, i, ite)
   
-   function dataset_vector:size() return #dataset_vector end
-     largeMseCount = 0;
-
-   local predictionValue = generalPerceptron:forward(dataset_vector)[1];
-
+   function input_profile:size() return #input_profile end   
+   local predictionValue = generalPerceptron:forward(input_profile)[1];
+   
    local meanSquareError = math.pow(targetValue - predictionValue,2);
    
    if (ite%PRINT_NUMBER==0 or i%PRINT_NUMBER==0) and VERBOSE==true  then
       io.write("(ite="..ite..") (ele="..i..") pred = "..signedValue(predictionValue).." target = "..signedValue(targetValue) .." => mse = "..round(meanSquareError,3));
 	io.flush();
-
-      if meanSquareError >= 0.5 then 
-	  io.write(" LARGE MeanSquareError"); 
-	  io.flush();
-	  largeMseCount = largeMseCount + 1;
-
-	--  sys.sleep(0.1);
-      end
-       io.write("\n");
     end
-   	  count = ite*DATA_SIZE+i;
-	  rate = largeMseCount*100/count
-	  --print("largeMseCount = "..largeMseCount.." / "..count.. "\t rate = "..round(rate,2).."%");
+   
+    count = ite*DATA_SIZE+i;
+    mseSum = mseSum + meanSquareError;
 	  
-	  mseSum = mseSum + meanSquareError;
+    if ite == iterations_number then
+	print("mseSum = mseSum + meanSquareError = "..round(mseSum,2).." + "..round(meanSquareError,2));
+    end
 	  
-	  if ite == iterations_number then
-	    print("mseSum = mseSum + meanSquareError = "..round(mseSum,2).." + "..round(meanSquareError,2));
-	  end
+    -- it's 50 because the error goes from 0 to 4
+    mseSumRate = mseSum*100/(count*MAX_POSSIBLE_MSE)
+    rateVector[#rateVector+1] = mseSumRate; 
+    rateIndexVector[#rateIndexVector+1] = count;
 	  
-	  -- it's 50 because the error goes from 0 to 4
-	  mseSumRate = mseSum*100/(count*MAX_POSSIBLE_MSE)
-	  rateVector[#rateVector+1] = mseSumRate; --rate
-	  rateIndexVector[#rateIndexVector+1] = count;
-	  
- 	  -- print("mseSum = "..comma_value(round(mseSum,2)).." / "..comma_value(count*MAX_POSSIBLE_MSE).. "\t mseSumRate = "..round(mseSumRate,2).."%");
+    -- print("mseSum = "..comma_value(round(mseSum,2)).." / "..comma_value(count*MAX_POSSIBLE_MSE).. "\t mseSumRate = "..round(mseSumRate,2).."%");
 
     if predictionValue*targetValue < 1 then
       gradientWrtOutput = torch.Tensor({-targetValue});
       generalPerceptron:zeroGradParameters();
-      generalPerceptron:backward(dataset_vector, gradientWrtOutput);    
-      
+      generalPerceptron:backward(input_profile, gradientWrtOutput);          
       
       if MOMENTUM_FLAG==false then  
 	    generalPerceptron:updateParameters(learningRate);
       else
-	if i==1 and ite==1 then print("MOMENTUM_FLAG == true") end
-	
-	    local currentParameters, currentGradParameters = generalPerceptron:parameters();	
-	    generalPerceptron:momentumUpdateParameters(learningRate, MOMENTUM_ALPHA, currentGradParameters);
-      end
-      
+	if i==1 and ite==1 then print("MOMENTUM_FLAG == true") end	
+	local currentParameters, currentGradParameters = generalPerceptron:parameters();	
+	generalPerceptron:momentumUpdateParameters(learningRate, MOMENTUM_ALPHA, currentGradParameters);
+      end      
     end
 
   return generalPerceptron;
@@ -776,7 +807,7 @@ require "nn";
  require "../../_project/bin/utils.lua"
  
  io.write(">>> th siamese_nn_toy.lua ");
- MAX_PARAMS = 15
+ MAX_PARAMS = 17
  for i=1,MAX_PARAMS do io.write(" "..tostring(arg[i])); end
  io.write("\n");
  io.flush();
@@ -827,10 +858,17 @@ require "nn";
  print("val_tuple_limit = "..val_tuple_limit);
  print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
  
+
+ local secondSpan_chrStart_locus = tonumber(arg[16]) 
+ local secondSpan_chrEnd_locus = tonumber(arg[17]) 
+ print("secondSpan_chrStart_locus = "..secondSpan_chrStart_locus);
+ print("secondSpan_chrEnd_locus = "..secondSpan_chrEnd_locus);
+
  
- if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
+if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
-and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-SEPARATE" then
+and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL"
+and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
   
   print("Error: execution is wrong! The program will stop!");
   os.exit();
@@ -839,54 +877,98 @@ end
 
 local regionLabel = chromSel.."-"..chrStart_locus.."-"..chrEnd_locus;
 
-experimentDetails = "==> Experiment details:\n "..regionLabel.."\n";
-experimentDetails = experimentDetails .." tuple_limit = "..tuple_limit.."\n";
-experimentDetails = experimentDetails .." percentage of (-1) negative elements in the training set and test set = "..balancedFalsePerc.."%\n";
-experimentDetails = experimentDetails .." percentage of (+1) positive elements in the training set and test set = "..tonumber(100-balancedFalsePerc).."%\n";
-experimentDetails = experimentDetails .." percentage of elements for the training set = "..TRAINING_SAMPLES_PERC.."%\n";
-experimentDetails = experimentDetails .." percentage of elements for the test set = "..tonumber(100-TRAINING_SAMPLES_PERC).."%\n";
+READ_DATA_FROM_DB = false
 
-local uniformDistribution = true;
-
--- READIN' THE TRAINING SET
-local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution)
-
-local balancedDatasetSize = unbal_data_read_output[1];    
--- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
-local dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
-    
-if balancedDatasetSize==0 then
-      print("No true interactions in the training set: the program is going to stop");
-      os.exit();
-end
-    
-local dataset_firstChromRegion = unbal_data_read_output[3];
-local dataset_secondChromRegion = unbal_data_read_output[4];
-local targetVector = unbal_data_read_output[5];
-
-DATA_SIZE = #dataset_firstChromRegion;
-print("DATA_SIZE = "..DATA_SIZE);
+local dataset_firstChromRegion = {}
+local dataset_secondChromRegion = {}
+local targetVector = {}
 
 local val_dataset_firstChromRegion = {}
 local val_dataset_secondChromRegion = {}
 local val_targetVector = {}
 
-
-
-
--- READIN' THE VALIDATION SET
-if execution == "OPTIMIZATION-TRAINING-HELD-OUT-SEPARATE" then
+if READ_DATA_FROM_DB == true then
   
-  local val_uniformDistribution = false;
+  experimentDetails = "==> Experiment details:\n "..regionLabel.."\n";
+  experimentDetails = experimentDetails .." tuple_limit = "..tuple_limit.."\n";
+  experimentDetails = experimentDetails .." percentage of (-1) negative elements in the training set and test set = "..balancedFalsePerc.."%\n";
+  experimentDetails = experimentDetails .." percentage of (+1) positive elements in the training set and test set = "..tonumber(100-balancedFalsePerc).."%\n";
+  experimentDetails = experimentDetails .." percentage of elements for the training set = "..TRAINING_SAMPLES_PERC.."%\n";
+  experimentDetails = experimentDetails .." percentage of elements for the test set = "..tonumber(100-TRAINING_SAMPLES_PERC).."%\n";
+
+  local uniformDistribution = true;
+
+  -- READIN' THE TRAINING SET
+  local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution)
+
+  local balancedDatasetSize = unbal_data_read_output[1];    
+  -- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
+  local dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
+      
+  if balancedDatasetSize==0 then
+	print("No true interactions in the training set: the program is going to stop");
+	os.exit();
+  end
+      
+  dataset_firstChromRegion = unbal_data_read_output[3];
+  dataset_secondChromRegion = unbal_data_read_output[4];
+  targetVector = unbal_data_read_output[5];
+
+  -- READIN' THE VALIDATION SET
+  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+    
+    local val_uniformDistribution = false;
+    
+    local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution)
+    
+    val_dataset_firstChromRegion = val_dataset_output[3];
+    val_dataset_secondChromRegion = val_dataset_output[4];
+    val_targetVector = val_dataset_output[5];  
+  end
   
-  local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution)
+    -- READIN' THE 2nd input training SET
+  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+    
+    
+    local secondSpan_dataset_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, secondSpan_chrStart_locus, secondSpan_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution);
+    
+    secondSpan_dataset_firstChromRegion = secondSpan_dataset_output[3];
+    secondSpan_dataset_secondChromRegion = secondSpan_dataset_output[4];
+    secondSpan_targetVector = secondSpan_dataset_output[5];      
+    
+    dataset_firstChromRegion =  tableConcat(dataset_firstChromRegion, secondSpan_dataset_firstChromRegion);
+    dataset_secondChromRegion =  tableConcat(dataset_secondChromRegion, secondSpan_dataset_secondChromRegion);
+    targetVector =  tableConcat(targetVector, secondSpan_targetVector);
+    
+  end
+
+else
   
-  val_dataset_firstChromRegion = val_dataset_output[3];
-  val_dataset_secondChromRegion = val_dataset_output[4];
-  val_targetVector = val_dataset_output[5];  
+  require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_RIGHT.lua"
+  require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_LEFT.lua"
+  require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_LABELS.lua"
+  
+  dataset_firstChromRegion = first_datasetGeneral
+  dataset_secondChromRegion = second_datasetGeneral
+  targetVector = targetDatasetGeneral
+
+  require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_LEFT.lua"
+  require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_RIGHT.lua"
+  require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_LABELS.lua"
+  
+  val_dataset_firstChromRegion = first_datasetGeneral
+  val_dataset_secondChromRegion = second_datasetGeneral
+  val_targetVector = targetDatasetGeneral
+  
+  
+  print("> > > > Data were read from files,  not from PostgreSQL < < < <");
+
+  
 end
 
 
+DATA_SIZE = #dataset_firstChromRegion;
+print("DATA_SIZE = "..DATA_SIZE);
 
 
 PRINT_NUMBER = 1
@@ -911,12 +993,15 @@ local first_datasetTest = {}
 local second_datasetTest = {}
 local targetDatasetTest = {}
 
+local vectorMCC = {}
+local vectorAccuracy = {}
+
 local stopConditionFlag = false
 
 TRAINING_SAMPLES = math.floor(DATA_SIZE*TRAINING_SAMPLES_PERC/100)
 print("TRAINING_SAMPLES = "..TRAINING_SAMPLES);
 
-if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-SEPARATE" then
+if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
   
 
 
@@ -958,7 +1043,7 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 
       local initialPerceptron = architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag);  
       
-      if execution == "OPTIMIZATION-TRAINING-HELD-OUT-SEPARATE" then		
+      if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then		
 
 	local first_datasetTrain = dataset_firstChromRegion
 	local second_datasetTrain = dataset_secondChromRegion
@@ -968,7 +1053,12 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local second_datasetTest = val_dataset_secondChromRegion
 	local targetDatasetTest = val_targetVector
 	
-	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel)
+	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel);
+	
+         vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
+	 vectorMCC[#vectorMCC+1] = applicationOutput[3];	
+	 -- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
+	 printVector(vectorMCC, "PARTIAL vectorMCC");
 	
 	local stopCondition = continueOrStopCheck(applicationOutput);
 	if stopCondition==true then break; end
@@ -983,20 +1073,24 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local second_datasetTest = subrange(dataset_secondChromRegion, TRAINING_SAMPLES+1, DATA_SIZE)
 	local targetDatasetTest = subrange(targetVector, TRAINING_SAMPLES+1, DATA_SIZE)
 	
-	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel)
+	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel);
+	
+	vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
+	vectorMCC[#vectorMCC+1] = applicationOutput[3];	
+	-- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
+	printVector(vectorMCC, "PARTIAL vectorMCC");
 	
 	local stopCondition = continueOrStopCheck(applicationOutput);
 	if stopCondition==true then break; end  
       
      elseif execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" then
        
-       K_FOLD = 10;
+       K_FOLD = 5;
        local span_size = math.floor(DATA_SIZE/K_FOLD);
        local globalPredictionVector = {}
        local truthVector = {}
        
-       local vectorMCC = {}
-       local vectorAccuracy = {}
+
        
        -- START K_FOLD CROSS VALIDATION LOOP -- 
        for k=1,K_FOLD do
@@ -1069,16 +1163,15 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threhsold, printValues)  
 
 	 vectorAccuracy[#vectorAccuracy+1] = output_confusion_matrix[1];
-	 vectorMCC[#vectorMCC+1] = output_confusion_matrix[4];
-	
-	 printVector(vectorAccuracy, "vectorAccuracy");
-	 printVector(vectorMCC, "vectorMCC");
+	 vectorMCC[#vectorMCC+1] = output_confusion_matrix[4];	
+	 printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
+	 printVector(vectorMCC, "PARTIAL vectorMCC");
 
        end         
 	
      end -- END HIDDEN UNITS LOOP
     
-    if stopCondition==true then break; end
+    if stopCondition==true then print("stopCondition==true then break") break; end
     
   end -- END HIDDEN LAYERS LOOP
 
@@ -1100,7 +1193,8 @@ elseif execution == "JUST-TESTING" then
 end
 
 
-
+printVector(vectorAccuracy, "FINAL vectorAccuracy");
+printVector(vectorMCC, "FINAL vectorMCC");
 
 
 

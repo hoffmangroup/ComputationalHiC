@@ -6,23 +6,23 @@ print('file: multiple_siamese_nn_toy.lua');
 print('author Davide Chicco <davide.chicco@gmail.com>');
 print(os.date("%c", os.time()));
 
-TEST_FLAG = false
+TEST_FLAG = true
 
 MAX_ARGS_NUM = 8
 
-local chromSel=tostring(arg[1]);
+local chromSel = tostring(arg[1]);
 local folderName = tostring(arg[2]);
 -- local folderName = "../results/tests_"..tostring(chromSel).."/"
 
-local dataSource=tostring(arg[3]); -- "Thurman_Miriam"
-local trainSamplesPerc=tonumber(arg[4]); -- 90, if not SEPARATE
+local dataSource = tostring(arg[3]); -- "Thurman_Miriam"
+local trainSamplesPerc = tonumber(arg[4]); -- 90, if not SEPARATE
 
-local trainNegElemsPerc=tonumber(arg[5]); -- 90
-local trainTupleLimit=tonumber(arg[6]); -- 5000
-local true_interactions_spanSize=trainTupleLimit*1.5 -- to have enough room
+local trainNegElemsPerc = tonumber(arg[5]); -- 90
+local trainTupleLimit = tonumber(arg[6]); -- 5000
+local true_interactions_spanSize = trainTupleLimit*1.5 -- to have enough room
 
-local val_negElemsPerc=tonumber(arg[7]); -- 90
-local val_tupleLimit=tonumber(arg[8]); -- 5000
+local val_negElemsPerc = tonumber(arg[7]); -- 90
+local val_tupleLimit = tonumber(arg[8]); -- 5000
 
 -- local trainExecutionMode = "OPTIMIZATION-TRAINING-HELD-OUT-SEPARATE";
 -- local trainExecutionMode = "OPTIMIZATION-TRAINING-CROSS-VALIDATION";
@@ -59,6 +59,7 @@ for i=1,#indices_start do
     local region = chromSel.."-"..tostring(chrStart).."-"..tostring(chrEnd);
     
     local label = "prediction_"..tostring(os.time()).."time_"..chromSel.."-"..tostring(chrStart).."-"..tostring(chrEnd).."_trainPer"..trainSamplesPerc.."_negPer"..tostring(trainNegElemsPerc);
+    label = label.."_trainTuples"..tostring(trainTupleLimit);
     outputFile=folderName.."/"..label.."_VALID"
     
     
