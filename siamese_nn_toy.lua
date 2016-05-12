@@ -18,9 +18,11 @@ REGULARIZATION = false;
 PERMUTATION_TRAIN = false
 PERMUTATION_TEST = true
 MINIBATCH_SPAN_NUMBER = 10
-MINIBATCH = false
+MINIBATCH = true
 SUFFICIENT_ACCURACY = 0.9
+
 SUFFICIENT_MCC = 0.5
+
 XAVIER_INITIALIZATION = false
 MOMENTUM_ALPHA = 0.5
 MOMENTUM_FLAG = false
@@ -36,17 +38,93 @@ local globalArrayFPvalues = {}
 globalMinFPplusFN_vector = {}
 
 
+-- Function that returns the majority between three elements
+function majorityGreaterThanThreshold(value1, value2, value3, threshold)
+  
+  if value1 >= threshold and (value2 >= threshold or value3 >= threshold) then return 1; end
+  if value2 >= threshold and (value1 >= threshold or value3 >= threshold) then return 1; end
+  if value3 >= threshold and (value1 >= threshold or value2 >= threshold) then return 1; end
+  
+  return 0;
+end
+
+-- Function that runs the k fold cross validation
+function kfold_cross_validation(dataset_firstChromRegion, dataset_secondChromRegion, targetVector, initialPerceptron, architectureLabel, DATA_SIZE)
+  
+       K_FOLD = 5;
+       local span_size = math.floor(DATA_SIZE/K_FOLD);
+       local globalPredictionVector = {}
+       local truthVector = {}
+  
+         -- START K_FOLD CROSS VALIDATION LOOP -- 
+       for k=1,K_FOLD do
+	 
+	 local test_initial_index = -1
+	 local test_last_index = -1
+	 
+	 if k==1 then	   
+	      test_initial_index = 1
+	      test_last_index = span_size
+	 elseif k==K_FOLD then
+	      test_initial_index = (span_size*(k-1))+1
+	      test_last_index = DATA_SIZE
+	 else
+	      test_initial_index = (span_size*(k-1))+1
+	      test_last_index = span_size*(k)	      
+	 end
+	 
+	 print("\n\n * * * * k-fold cross validation \t k = "..k.."/"..K_FOLD.." test_initial_index = "..test_initial_index.."  test_last_index = "..test_last_index.. " * * * * ");
+	 
+	 local first_datasetTrain = {}
+	 local second_datasetTrain = {}
+	 local targetDatasetTrain = {}
+	  
+	 local first_datasetTest  = {}
+	 local second_datasetTest = {}
+	 local targetDatasetTest = {}
+	 
+	 for i=1,DATA_SIZE do	   
+	   if i >= test_initial_index and i <= test_last_index then
+	     first_datasetTest[#first_datasetTest+1]  = dataset_firstChromRegion[i];
+	     second_datasetTest[#second_datasetTest+1] = dataset_secondChromRegion[i];
+	     targetDatasetTest[#targetDatasetTest+1] = targetVector[i];
+	   else
+	     first_datasetTrain[#first_datasetTrain+1]  = dataset_firstChromRegion[i];
+	     second_datasetTrain[#second_datasetTrain+1] = dataset_secondChromRegion[i];
+	     targetDatasetTrain[#targetDatasetTrain+1] = targetVector[i];	     
+	   end	   
+	 end
+	 	    
+	  local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
+		
+	  local lastAccuracy = applicationOutput[1];
+	  local predictionVect = applicationOutput[2];	
+	  local sortedTruthVect = applicationOutput[4];	
+	  
+	   local c=1;
+	  for t=test_initial_index,test_last_index do
+	    globalPredictionVector[t]=predictionVect[c];
+	    truthVector[t]=sortedTruthVect[c];
+	    c = c+1;
+	  end
+	
+	end 
+	  -- END K_FOLD CROSS VALIDATION LOOP-- 
+	
+	return {globalPredictionVector, truthVector};
+end
 
 
 
 -- function that checks the stop condition for each iteration
-function continueOrStopCheck(applicationOutput)
-
-	local lastAccuracy = applicationOutput[1];
-	local predictionVect = applicationOutput[2];
-	local lastMCC = applicationOutput[3];
+function continueOrStopCheck(lastAccuracy, lastMCC)
+	
 	local stopConditionFlag = false;
+	
+	print("lastMCC = "..lastMCC);
 
+	-- if lastMCC >= SUFFICIENT_MCC and lastMCC < (SUFFICIENT_MCC+0.1) then
+	
 	if lastMCC >= SUFFICIENT_MCC then 
 	    saveModelToFile(generalPerceptron, chromSel, chrStart_locus, chrEnd_locus, trainedModelFile); 
 	    
@@ -188,29 +266,41 @@ end
 
 
 -- Function that applies the neural network
-function siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel)	
+function siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, modelFile)	
 	
-	  local generalPerceptron = siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain,  targetDatasetTrain, initialPerceptron)      
+	  local time_training = os.time();
+	  local generalPerceptron = siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain,  targetDatasetTrain, initialPerceptron);
+	  
+	  printTime(time_training, "Training duration ");
+	  
+	  torch.save(tostring(modelFile), generalPerceptron);
+	  print("Saved model file: "..tostring(modelFile));
 
+	  local lastMseError = -1;
 	  if MINIBATCH==false then
 	    local zeroChar = ""
-	    local lastMseError = rateVector[#rateVector];
+	    lastMseError = rateVector[#rateVector];
 	    if lastMseError < 10 then zeroChar = "0" end      
 	    -- legend = "hidden units = "..tostring(hiddenUnits).."; hidden layers = "..tostring(hiddenLayers)..";";
 	    legend = " learnRate = "..tostring(LEARNING_RATE_CONST);
 	    legend = legend .. "; last mse = "..zeroChar..""..tostring(round(lastMseError,2)).."%";
 	    print("legend: "..legend)
-
+	  end
 	  -- %%%%%%%%%%%%%%%%%%%%% TEST %%%%%%%%%%%%%%%%%%%%%%%
 
-	    local testModelOutput = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, generalPerceptron)
+	    local time_testing = os.time();
+	    local testModelOutput = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, generalPerceptron)	    
+	    printTime(time_testing, "Testing duration ");
 
 	    local thisAccuracy = round(testModelOutput[1],2);
 	    local thisMCC = signedValueFunction(round(testModelOutput[3],2));
 	    if tonumber(thisMCC) < -1 then thisMCC="Not"; end
 	    if thisAccuracy < -1 then thisAccuracy="Not"; end
 	    architectureLabel = architectureLabel.."_Mcc"..tostring(thisMCC).."_accuracy"..tostring(thisAccuracy);
-	    architectureLabel = architectureLabel.."_lastMse"..tostring(round(lastMseError,2)).."perc";
+	    
+	    if MINIBATCH==false then
+	      architectureLabel = architectureLabel.."_lastMse"..tostring(round(lastMseError,2)).."perc";
+	    end
 	    
 	    architectureLabel= string.gsub(architectureLabel, "=", "")
 	    
@@ -232,9 +322,10 @@ function siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrai
 	      execute_command(command);
 	    end
 	    
-	  return testModelOutput;      
+	    print("thisMCC = "..thisMCC);
+	  return testModelOutput;
 	  
-	  end
+	 
 end
 
 
@@ -322,7 +413,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	local loopIterations = 1
 	local trainIndexVect = {}; for i=1, #first_datasetTrain do trainIndexVect[i] = i;  end
 	
-	print("#trainIndexVect = "..#trainIndexVect);
+	print("#trainIndexVect = "..comma_value(#trainIndexVect));
 
 	local permutedTrainIndexVect = {};
 	if PERMUTATION_TRAIN == true then
@@ -434,18 +525,22 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		      upper_index = #first_datasetTrain
 		    end
 		    
+		   -- io.write("(ite = "..ite..") (m = "..m..") ")
+		   -- io.write("lower_index = "..lower_index.."\tupper_index = "..upper_index.." ");
+		    
 		    local temp_train_left = newleftTens[{{lower_index,upper_index}}]
 		    local temp_train_right = newrightTens[{{lower_index,upper_index}}]
 		    
 		    minibatch_train[c] = {temp_train_left, temp_train_right}		    
 		    target_train[c] = subtable(normTargetDatasetTrain, lower_index, upper_index)
 		    
-		    generalPerceptron = gradientUpdateMinibatch(generalPerceptron, minibatch_train[c], target_train[c], learnRate);		    
+		    generalPerceptron = gradientUpdateMinibatch(generalPerceptron, minibatch_train[c], target_train[c], learnRate, ite);		    
 		    
-		    local predicted = generalPerceptron:forward(minibatch_train[c])[1];		
-		    predicted = (predicted +1)/2;
+		   -- local predicted = generalPerceptron:forward(minibatch_train[c])[1];		
+		    -- print("=> predicted = \t"..predicted)  
+		    -- predicted = (predicted +1)/2;
 		    
-		    -- print("=> predicted = "..predicted)  
+		    -- print("=> training prediction = \t"..round(predicted,2))  
 		    
 		    c = c + 1
 		    loopIterations = loopIterations + 1
@@ -453,6 +548,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	  end
 	end
 	
+
    return generalPerceptron;
 end
 
@@ -481,7 +577,11 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
 	
 	local testDataset={first_datasetTest[thisIndex], second_datasetTest[thisIndex]}
 	local testPredictionValue = generalPerceptron:forward(testDataset)[1];
+	-- print("generalPerceptron:forward(testDataset)[1] =\t "..generalPerceptron:forward(testDataset)[1]);
+	-- print("generalPerceptron:forward(testDataset)[2] =\t "..generalPerceptron:forward(testDataset)[2]);
+
 	testPredictionValue = (testPredictionValue+1)/2;
+	print("(testPredictionValue + 1) / 2 =\t "..testPredictionValue)
 	local target = targetDatasetTest[thisIndex][1];
 
 	predictionTestVect[#predictionTestVect+1] = testPredictionValue;
@@ -490,7 +590,11 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     end
 
     local printValues = false;
+    
+    local timeConfMat = os.time();
     output_confusion_matrix = confusion_matrix(predictionTestVect, truthVect, threshold, printValues);    
+    printTime(timeConfMat, "Confusion matrix computation ");
+    
     lastAccuracy = output_confusion_matrix[1];
     globalArrayFPindices = output_confusion_matrix[2];
     globalArrayFPvalues = output_confusion_matrix[3];
@@ -603,6 +707,9 @@ function confusion_matrix(predictionTestVect, truthVect, threshold, printValues)
 	print("total rate = "..round(totalRate,2).." in [-1, +3] that is "..round((totalRate+1)*100/4,2).."% of possible correctness");
       end
       
+      local numberOfPredictedOnes = tp + fp;
+      print("numberOfPredictedOnes = (TP + FP) = "..numberOfPredictedOnes.." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp)).."%");
+      
       io.write("\nDiagnosis: ");
       if (fn >= tp and (fn+tp)>0) then print("too many FN false negatives"); end
       if (fp >= tn and (fp+tn)>0) then print("too many FP false positives"); end
@@ -669,18 +776,27 @@ end
 
 
 -- Gradient update for the siamese neural network with minibatch
-function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector, learningRate);
+function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector, learningRate, ite);
   
-   function dataset_vector:size() return #dataset_vector end
+  function dataset_vector:size() return #dataset_vector end
      
-   local target_array_tensors = changeSignOfArray(targetVector)  
-   local gradientWrtOutput = torch.Tensor(target_array_tensors)
-     
-   local predictionValue = generalPerceptron:forward(dataset_vector);
-   --print("gradientUpdateMinibatch() predictionValue = "..round(predictionValue,4));
-
+  local target_array_tensors = changeSignOfArray(targetVector)  
+  local gradientWrtOutput = torch.Tensor(target_array_tensors)     
+  local predictionValue = generalPerceptron:forward(dataset_vector)
    
-   predictionValue = predictionValue[1];
+  local mseVect = {}
+  local mseSum = 0
+  
+  for p=1,(#predictionValue)[1] do
+  --  print('predictionValue['..p..'] = '..predictionValue[p]);
+    mseVect[p] = math.pow(targetVector[p] - predictionValue[p],2);
+    mseSum = mseSum + mseVect[p];
+  end  
+  local averageMse = mseSum/((#predictionValue)[1]);
+ 
+  print("(ite = "..ite..") minibatch average mse = "..round(averageMse,3));
+   
+
    generalPerceptron:zeroGradParameters();
    generalPerceptron:backward(dataset_vector, gradientWrtOutput);
    generalPerceptron:updateParameters(learningRate);
@@ -820,8 +936,8 @@ require "nn";
  local locus_position_limit = 500000
  local balancedFlag = false
  local chromSel = tostring(arg[3]);
- local chrStart_locus = tonumber(arg[4]) -- 46562780
- local chrEnd_locus = tonumber(arg[5]) --  47409790
+ local chrStart_locus = tonumber(arg[4])
+ local chrEnd_locus = tonumber(arg[5]) 
  local dataSource = "Thurman_Miriam"
  local original_tuple_limit = 100
  local balancedFalsePerc = tonumber(arg[6])
@@ -850,25 +966,43 @@ require "nn";
  
  print("retrieveFP_flag = "..tostring(retrieveFP_flag));
  
- local val_chrStart_locus = tonumber(arg[12]) 
- local val_chrEnd_locus = tonumber(arg[13]) 
- local val_tuple_limit = tonumber(arg[14]) 
- local val_balancedFalsePerc = tonumber(arg[15]) 
- print("validation segment: "..chromSel.." from "..val_chrStart_locus.." to "..val_chrEnd_locus);
- print("val_tuple_limit = "..val_tuple_limit);
- print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
+ local val_chrStart_locus = -1
+ local val_chrEnd_locus = -1
+ local val_tuple_limit = -1
+ local val_balancedFalsePerc = -1
+  
+    val_chrStart_locus = tonumber(arg[12]) 
+    val_chrEnd_locus = tonumber(arg[13]) 
+    val_tuple_limit = tonumber(arg[14]) 
+    val_balancedFalsePerc = tonumber(arg[15]) 
+      
+    print("validation segment: "..chromSel.." from "..val_chrStart_locus.." to "..val_chrEnd_locus);
+    print("val_tuple_limit = "..val_tuple_limit);
+    print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
  
 
- local secondSpan_chrStart_locus = tonumber(arg[16]) 
- local secondSpan_chrEnd_locus = tonumber(arg[17]) 
+ local secondSpan_chrStart_locus = -1 
+ local secondSpan_chrEnd_locus = -1
+
+ 
+ if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+
+ secondSpan_chrStart_locus = tonumber(arg[16]) 
+ secondSpan_chrEnd_locus = tonumber(arg[17]) 
  print("secondSpan_chrStart_locus = "..secondSpan_chrStart_locus);
  print("secondSpan_chrEnd_locus = "..secondSpan_chrEnd_locus);
-
+ end
  
 if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
 and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL"
-and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
+and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT"
+and execution ~=  "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"
+and execution ~=  "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
+and execution ~= "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" 
+and execution ~= "JUST-TESTING"
+and execution ~= "BOOSTING-TESTING" then
   
   print("Error: execution is wrong! The program will stop!");
   os.exit();
@@ -877,7 +1011,7 @@ end
 
 local regionLabel = chromSel.."-"..chrStart_locus.."-"..chrEnd_locus;
 
-READ_DATA_FROM_DB = false
+READ_DATA_FROM_DB = true
 
 local dataset_firstChromRegion = {}
 local dataset_secondChromRegion = {}
@@ -886,6 +1020,11 @@ local targetVector = {}
 local val_dataset_firstChromRegion = {}
 local val_dataset_secondChromRegion = {}
 local val_targetVector = {}
+local dnaseDataTable_only_IDs_training = {}
+local dnaseDataTable_only_IDs_val = {}
+
+local dnaseDataTable = {}
+local val_dnaseDataTable = {}
 
 if READ_DATA_FROM_DB == true then
   
@@ -903,7 +1042,9 @@ if READ_DATA_FROM_DB == true then
 
   local balancedDatasetSize = unbal_data_read_output[1];    
   -- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
-  local dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
+  dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
+  
+  dnaseDataTable_only_IDs_training = unbal_data_read_output[8];
       
   if balancedDatasetSize==0 then
 	print("No true interactions in the training set: the program is going to stop");
@@ -915,19 +1056,22 @@ if READ_DATA_FROM_DB == true then
   targetVector = unbal_data_read_output[5];
 
   -- READIN' THE VALIDATION SET
-  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
     
     local val_uniformDistribution = false;
     
     local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution)
     
+    val_dnaseDataTable = val_dataset_output[2]; 
     val_dataset_firstChromRegion = val_dataset_output[3];
     val_dataset_secondChromRegion = val_dataset_output[4];
     val_targetVector = val_dataset_output[5];  
+    
+    dnaseDataTable_only_IDs_val = val_dataset_output[8];
   end
   
     -- READIN' THE 2nd input training SET
-  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
+  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
     
     
     local secondSpan_dataset_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, secondSpan_chrStart_locus, secondSpan_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution);
@@ -967,14 +1111,80 @@ else
 end
 
 
+NO_INTERSECTION_BETWEEN_SETS = true;
+
+if NO_INTERSECTION_BETWEEN_SETS==true then
+
+    -- Remove the test set elements from the training set
+    print("Remove the test set elements from the training set");
+    print("before removal:")
+    print("BEFORE #dnaseDataTable = "..#dnaseDataTable)
+    print("BEFORE #dataset_firstChromRegion = "..#dataset_firstChromRegion)
+    print("BEFORE #dataset_secondChromRegion = "..#dataset_secondChromRegion)
+    print("BEFORE #targetVector = "..#targetVector)
+
+    local index = 1
+    local _size = #val_dnaseDataTable  
+    local kRate = 1
+    for k=1,_size do
+      
+	kRate=(k*100/_size)*100
+	if (kRate*10)%10==0 then 
+	    io.write(kRate.."% "); io.flush(); 
+	end
+      
+	local output_contains = chromRegionTableContains(dnaseDataTable, val_dnaseDataTable[k])
+	local label = output_contains[1]
+	--print("label = "..tostring(label))
+	local position = output_contains[2]
+	-- print("position = "..position)
+	if label  then
+	  io.write("(k="..k.." remove)\t");
+	  io.flush();
+	  table.remove(dnaseDataTable, position);
+	  table.remove(dataset_firstChromRegion, position);
+	  table.remove(dataset_secondChromRegion, position);
+	  table.remove(targetVector, position);
+	  index = 1
+	  -- print(" #dnaseDataTable = "..#dnaseDataTable.."\tindex = "..index.."\t_size = ".._size)
+	else
+	  --io.write("\n");
+	  index = index +1 
+	end  
+	
+    end
+
+end
+
+-- print("after removal:")
+-- print("AFTER #dnaseDataTable = "..#dnaseDataTable)
+-- print("AFTER #dataset_firstChromRegion = "..#dataset_firstChromRegion)
+-- print("AFTER #dataset_secondChromRegion = "..#dataset_secondChromRegion)
+-- print("AFTER #targetVector = "..#targetVector)
+-- 
+-- print("\n#val_dnaseDataTable = "..#val_dnaseDataTable)
+-- for k=1,#val_dnaseDataTable do
+--   
+--     io.write("chr"..val_dnaseDataTable[k][1].."_"..val_dnaseDataTable [k][2].."_"..val_dnaseDataTable[k][3].."\n");  
+-- end
+-- 
+-- io.write("\n")
+-- print("#dnaseDataTable = "..#dnaseDataTable)
+-- for k=1,#dnaseDataTable do
+--     
+--     io.write("chr"..dnaseDataTable[k][1].."_"..dnaseDataTable[k][2].."_"..dnaseDataTable[k][3].."\n");
+-- end
+
+
+
 DATA_SIZE = #dataset_firstChromRegion;
-print("DATA_SIZE = "..DATA_SIZE);
+print("DATA_SIZE = ".. comma_value(DATA_SIZE));
 
 
 PRINT_NUMBER = 1
 if DATA_SIZE >= 1000 then PRINT_NUMBER = round(DATA_SIZE/500);
 else PRINT_NUMBER = round(DATA_SIZE/10); end
-print("PRINT_NUMBER = "..PRINT_NUMBER);
+-- print("PRINT_NUMBER = "..PRINT_NUMBER);
 
 print("MINIBATCH = "..tostring(MINIBATCH));
 print("XAVIER_INITIALIZATION = "..tostring(XAVIER_INITIALIZATION));
@@ -999,13 +1209,13 @@ local vectorAccuracy = {}
 local stopConditionFlag = false
 
 TRAINING_SAMPLES = math.floor(DATA_SIZE*TRAINING_SAMPLES_PERC/100)
-print("TRAINING_SAMPLES = "..TRAINING_SAMPLES);
-
-if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
-  
-
+print("TRAINING_SAMPLES = "..comma_value(TRAINING_SAMPLES));
 
   local dropOutFlag = true
+
+if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
+  
+
   local largeMseCount = 0; 
   local generalPerceptronToSave = {};
 
@@ -1053,14 +1263,14 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local second_datasetTest = val_dataset_secondChromRegion
 	local targetDatasetTest = val_targetVector
 	
-	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel);
+	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
 	
-         vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
-	 vectorMCC[#vectorMCC+1] = applicationOutput[3];	
-	 -- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
-	 printVector(vectorMCC, "PARTIAL vectorMCC");
+        vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
+	vectorMCC[#vectorMCC+1] = applicationOutput[3];	
+	-- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
+	printVector(vectorMCC, "PARTIAL vectorMCC");
 	
-	local stopCondition = continueOrStopCheck(applicationOutput);
+	local stopCondition = continueOrStopCheck(applicationOutput[1], applicationOutput[3]);
 	if stopCondition==true then break; end
 
      elseif execution == "OPTIMIZATION-TRAINING-HELD-OUT" then		
@@ -1073,99 +1283,42 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local second_datasetTest = subrange(dataset_secondChromRegion, TRAINING_SAMPLES+1, DATA_SIZE)
 	local targetDatasetTest = subrange(targetVector, TRAINING_SAMPLES+1, DATA_SIZE)
 	
-	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel);
+	local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
 	
 	vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
 	vectorMCC[#vectorMCC+1] = applicationOutput[3];	
 	-- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
 	printVector(vectorMCC, "PARTIAL vectorMCC");
 	
-	local stopCondition = continueOrStopCheck(applicationOutput);
+	print("applicationOutput[3] = "..applicationOutput[3])
+	
+	local stopCondition = continueOrStopCheck(applicationOutput[1], applicationOutput[3]);
 	if stopCondition==true then break; end  
       
-     elseif execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" then
+     elseif execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
        
-       K_FOLD = 5;
-       local span_size = math.floor(DATA_SIZE/K_FOLD);
        local globalPredictionVector = {}
        local truthVector = {}
-       
 
+       local kfold_output = kfold_cross_validation(dataset_firstChromRegion, dataset_secondChromRegion, targetVector, initialPerceptron, architectureLabel, DATA_SIZE);
        
-       -- START K_FOLD CROSS VALIDATION LOOP -- 
-       for k=1,K_FOLD do
-	 
-	 local test_initial_index = -1
-	 local test_last_index = -1
-	 
-	 if k==1 then	   
-	      test_initial_index = 1
-	      test_last_index = span_size
-	 elseif k==K_FOLD then
-	      test_initial_index = (span_size*(k-1))+1
-	      test_last_index = DATA_SIZE
-	 else
-	      test_initial_index = (span_size*(k-1))+1
-	      test_last_index = span_size*(k)	      
-	 end
-	 
-	 print("\n\n * * * * k-fold cross validation \t k = "..k.."/"..K_FOLD.." test_initial_index = "..test_initial_index.."  test_last_index = "..test_last_index.. " * * * * ");
-	 
-	 local first_datasetTrain = {}
-	 local second_datasetTrain = {}
-	 local targetDatasetTrain = {}
-	  
-	 local first_datasetTest  = {}
-	 local second_datasetTest = {}
-	 local targetDatasetTest = {}
-	 
-	 for i=1,DATA_SIZE do	   
-	   if i >= test_initial_index and i <= test_last_index then
-	     first_datasetTest[#first_datasetTest+1]  = dataset_firstChromRegion[i];
-	     second_datasetTest[#second_datasetTest+1] = dataset_secondChromRegion[i];
-	     targetDatasetTest[#targetDatasetTest+1] = targetVector[i];
-	   else
-	     first_datasetTrain[#first_datasetTrain+1]  = dataset_firstChromRegion[i];
-	     second_datasetTrain[#second_datasetTrain+1] = dataset_secondChromRegion[i];
-	     targetDatasetTrain[#targetDatasetTrain+1] = targetVector[i];	     
-	   end	   
-	 end
-	 	    
-	  local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel)
-		
-	  local lastAccuracy = applicationOutput[1];
-	  local predictionVect = applicationOutput[2];	
-	  local sortedTruthVect = applicationOutput[4];	
-	  
-	   local c=1;
-	  for t=test_initial_index,test_last_index do
-	    globalPredictionVector[t]=predictionVect[c];
-	    truthVector[t]=sortedTruthVect[c];
-	    c = c+1;
-	  end
-	
-	end 
-	  -- END K_FOLD CROSS VALIDATION LOOP-- 
-	
---  	local truthVector = {}
--- 	for q=1,DATA_SIZE do	  
--- 	  truthVector[q]=targetVector[q][1];  
--- 	  print("truthVector["..q.."] "..truthVector[q]);
--- 	end
+       globalPredictionVector = kfold_output[1];
+       truthVector = kfold_output[2];
 
-	local threhsold = 0.5		
-	-- print("#globalPredictionVector = "..#globalPredictionVector);
-	-- print("#truthVector = "..#truthVector);
+       local threshold = 0.5		
 
 	print("$$$ K-fold cross validation finished, general rates $$$");
 	-- metrics_ROC_AUC_computer(globalPredictionVector, truthVector)
 	local printValues = true;
-	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threhsold, printValues)  
+	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threshold, printValues)  
 
 	 vectorAccuracy[#vectorAccuracy+1] = output_confusion_matrix[1];
 	 vectorMCC[#vectorMCC+1] = output_confusion_matrix[4];	
 	 printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
 	 printVector(vectorMCC, "PARTIAL vectorMCC");
+	 
+	local stopCondition = continueOrStopCheck(output_confusion_matrix[1], output_confusion_matrix[4]);
+	if stopCondition==true then break; end  
 
        end         
 	
@@ -1174,6 +1327,75 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
     if stopCondition==true then print("stopCondition==true then break") break; end
     
   end -- END HIDDEN LAYERS LOOP
+  
+elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
+  
+      hiddenUnits = 100
+      hiddenLayers = 1
+
+      local input_number = CELL_TYPE_NUMBER
+      local output_layer_number = CELL_TYPE_NUMBER
+      
+      io.write(" dropOutFlag = "..tostring(dropOutFlag));
+      io.write(" hiddenUnits = "..hiddenUnits);
+      io.write(" hiddenLayers = "..hiddenLayers.."\n");
+      io.flush();
+      
+      local architectureLabel = tostring("_"..regionLabel.."_tuples="..tuple_limit.."_hiddenUnits="..tostring(hiddenUnits).."_hiddenLayers="..tostring(hiddenLayers));
+
+      local initialPerceptron = architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag);  
+      
+      local first_datasetTrain = dataset_firstChromRegion
+      local second_datasetTrain = dataset_secondChromRegion
+      local targetDatasetTrain = targetVector
+
+      local first_datasetTest = val_dataset_firstChromRegion
+      local second_datasetTest = val_dataset_secondChromRegion
+      local targetDatasetTest = val_targetVector
+	
+      
+      local timeSiameseNeuralNetwork_application = os.time();
+      
+      local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
+      
+      printTime(timeSiameseNeuralNetwork_application, "Siamese neural network application duration ");
+
+      
+elseif execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
+      
+      hiddenUnits = 100
+      hiddenLayers = 1
+
+      local input_number = CELL_TYPE_NUMBER
+      local output_layer_number = CELL_TYPE_NUMBER
+      
+      io.write(" dropOutFlag = "..tostring(dropOutFlag));
+      io.write(" hiddenUnits = "..hiddenUnits);
+      io.write(" hiddenLayers = "..hiddenLayers.."\n");
+      io.flush();
+      
+      local architectureLabel = tostring("_"..regionLabel.."_tuples="..tuple_limit.."_hiddenUnits="..tostring(hiddenUnits).."_hiddenLayers="..tostring(hiddenLayers));
+
+      local initialPerceptron = architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag);
+  
+  
+       local globalPredictionVector = {}
+       local truthVector = {}
+
+       local kfold_output = kfold_cross_validation(dataset_firstChromRegion, dataset_secondChromRegion, targetVector, initialPerceptron, architectureLabel, DATA_SIZE);
+       
+       globalPredictionVector = kfold_output[1];
+       truthVector = kfold_output[2];
+
+       local threshold = 0.5		
+
+	print("$$$ K-fold cross validation finished, general rates $$$");
+	-- metrics_ROC_AUC_computer(globalPredictionVector, truthVector)
+	local printValues = true;
+	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threshold, printValues)  
+	
+	
+-- 	local testModelOutput = testModel(val_dataset_firstChromRegion, val_dataset_secondChromRegion, targetDatasetTest, QUALE PERCEPTRON????)
 
 elseif execution == "JUST-TESTING" then
 
@@ -1188,9 +1410,57 @@ elseif execution == "JUST-TESTING" then
   print("\n\n\n : : : : : EXTERNAL TEST  : : : : : ");
 
 
+  local timeTestModel = os.time();
   local testModelOutput = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, loadedPerceptron)
+  printTime(timeTestModel, "Testing duration ");
+  
+elseif execution == "BOOSTING-TESTING" then
+
+ first_datasetTest = dataset_firstChromRegion
+ second_datasetTest = dataset_secondChromRegion
+ targetDatasetTest = targetVector
+ 
+ local testModelOutput = {}
+ local predictionTestVectList = {}
+ local threshold = 0.5
+ local truthVect = {} 
+ local boostingTrainedModelFile = {}
+ 
+ boostingTrainedModelFile[1] = "./models/chr21-15630020-28144290_IMBAL-NEG_trained_model";
+ boostingTrainedModelFile[2] = "./models/chr21-36793160-39866830_BALA_trained_model";
+ boostingTrainedModelFile[3] = "./models/chr21-35021440-36789490_IMBAL-POS_trained_model";
+ 
+ MAX_MODELS = 3
+  for i=1,MAX_MODELS do
+
+    print("\n : : : : : BOOSTING EXTERNAL TEST  : : : : : ");
+    print("modelFile to read: ".. (boostingTrainedModelFile[i]));
+    local loadedPerceptron =  torch.load(boostingTrainedModelFile[i]);       
+
+    local timeTestModel = os.time();
+    testModelOutput[i] = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, loadedPerceptron);
+    
+    predictionTestVectList[i] = testModelOutput[i][2];
+    truthVect = testModelOutput[i][4];
+    
+    -- testModel(): return {lastAccuracy, predictionTestVect, lastMCC, truthVect};  
+    printTime(timeTestModel, "Testing duration ");   
+  end
+ 
+  local majorityPredictionVect = {}
+  
+  print("\n : : : : : BOOSTING MAJORITY TEST  : : : : : ");
+  -- compute the majority
+  for j=1,#(predictionTestVectList[1]) do    
+      majorityPredictionVect[j] = majorityGreaterThanThreshold(predictionTestVectList[1][j], predictionTestVectList[2][j], predictionTestVectList[3][j], threshold);    
+  end
+  
+  local printValues = false
+  local output_confusion_matrix = confusion_matrix(majorityPredictionVect, truthVect, threshold, printValues)  
   
 end
+
+
 
 
 printVector(vectorAccuracy, "FINAL vectorAccuracy");

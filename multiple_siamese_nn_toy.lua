@@ -1,14 +1,17 @@
-require "../../_project/bin/database_management.lua"
-require "../../_project/bin/utils.lua"
+
+
+
+require "../../_project/bin/database_management.lua";
+require "../../_project/bin/utils.lua";
 
 print('\n\n @ @ @ @ @ @ START @ @ @ @ @ @ @ ');
 print('file: multiple_siamese_nn_toy.lua');
 print('author Davide Chicco <davide.chicco@gmail.com>');
 print(os.date("%c", os.time()));
 
-TEST_FLAG = true
+TEST_FLAG = true;
 
-MAX_ARGS_NUM = 8
+MAX_ARGS_NUM = 9;
 
 local chromSel = tostring(arg[1]);
 local folderName = tostring(arg[2]);
@@ -28,14 +31,14 @@ local val_tupleLimit = tonumber(arg[8]); -- 5000
 -- local trainExecutionMode = "OPTIMIZATION-TRAINING-CROSS-VALIDATION";
 local trainExecutionMode = tostring(arg[9]);
 
-io.write("==> command: th multiple_siamese_nn_toy.lua ")
+io.write("==> command: th multiple_siamese_nn_toy.lua ");
 for i=1,MAX_ARGS_NUM do
-  io.write(arg[i].." ")
+  io.write(arg[i].." ");
 end
 io.write("\n");
 
-if trainNegElemsPerc >= 100 then print("Error: trainNegElemsPerc must be < 100, while it is "..trainNegElemsPerc.."%") end
-if val_negElemsPerc >= 100 then print("Error: val_negElemsPerc must be < 100, while it is "..val_negElemsPerc.."%") end
+if trainNegElemsPerc >= 100 then print("Error: trainNegElemsPerc must be < 100, while it is "..trainNegElemsPerc.."%"); end
+if val_negElemsPerc >= 100 then print("Error: val_negElemsPerc must be < 100, while it is "..val_negElemsPerc.."%"); end
 
 
 -- local mkdirCommand = " mkdir "..folderName;
@@ -45,6 +48,8 @@ if val_negElemsPerc >= 100 then print("Error: val_negElemsPerc must be < 100, wh
 
 
 local vect = selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize, dataSource);
+
+-- os.exit();
 
 local indices_start = vect[1];
 local indices_end = vect[2];
