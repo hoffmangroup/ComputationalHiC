@@ -54,6 +54,7 @@ local vect = selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_span
 local indices_start = vect[1];
 local indices_end = vect[2];
 local modelFileName = "";
+local minibatch_flag = false
 
 for i=1,#indices_start do
   
@@ -79,6 +80,7 @@ for i=1,#indices_start do
     local command = "qsub -q hoffmangroup -N "..label.." -cwd -b y -o "..outputFile.." -e "..outputFile.." th siamese_nn_toy.lua "..label.." "..trainTupleLimit.." "..chromSel.." "..chrStart.." "..chrEnd.." "..trainNegElemsPerc.." "..trainSamplesPerc.." "..outputFile .." "..tostring(trainExecutionMode).." "..tostring(modelFileName).." "..tostring(retriveFP_flag);
     
     command = command.." "..val_chrStart_locus.." "..val_chrEnd_locus.." "..val_tuple_limit.." "..val_balancedFalsePerc;
+    command = command.." -1 -1 "..tostring(minibatch_flag); -- secondSpan_chrStart_locus, secondSpan_chrEnd_locus, MINIBATCH
 
     execute_command(command);
     print("Command launched:\t\t\t".. command);
@@ -102,7 +104,7 @@ for i=1,#indices_start do
     trainTupleLimit = -1;
 
     local command = "qsub -q hoffmangroup -N "..label.." -cwd -b y -o "..outputFile.." -e "..outputFile.." th siamese_nn_toy.lua "..label.." "..trainTupleLimit.." "..chromSel.." "..chrStart.." "..chrEnd.." "..trainNegElemsPerc.." "..trainSamplesPerc.." "..outputFile .." "..tostring(executionMode).." "..tostring(modelFileName).." "..tostring(retriveFP_flag);
-    command = command.." -1 -1 -1 -1";
+    command = command.." -1 -1 -1 -1 "..tostring(minibatch_flag);
 
     if TEST_FLAG == true then
      execute_command(command);
