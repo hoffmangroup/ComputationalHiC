@@ -14,10 +14,14 @@
 
 L2_WEIGHT = 0.000001;
 REGULARIZATION = false;
+MINIBATCH = false
 
 PERMUTATION_TRAIN = false
 PERMUTATION_TEST = true
 MINIBATCH_SPAN_NUMBER = 10
+-- MINIBATCH_SIZE = 20 -- working
+MINIBATCH_SIZE = 5
+
 SUFFICIENT_ACCURACY = 0.9
 
 SUFFICIENT_MCC = 0.5
@@ -26,7 +30,7 @@ XAVIER_INITIALIZATION = false
 MOMENTUM_ALPHA = 0.5
 MOMENTUM_FLAG = false
 
-ITERATIONS_CONST = 10 -- TO REPLACE WITH 1000
+ITERATIONS_CONST = 1000 -- TO REPLACE WITH 1000
 LEARNING_RATE_CONST = 0.001
 MAX_POSSIBLE_MSE = 4
 CELL_TYPE_NUMBER = 82
@@ -36,55 +40,18 @@ local globalArrayFPindices = {}
 local globalArrayFPvalues = {}
 globalMinFPplusFN_vector = {}
 
--- -- Function tempPerceptron
--- function tempPerceptron(input_number, hiddenUnits, output_number, hiddenLayers)
---   
---   local perceptronUpper= nn.Sequential()
---   perceptronUpper:add((nn.Linear(input_number, hiddenUnits)))
---   perceptronUpper:add(nn.ReLU())
---   -- perceptronUpper:add(nn.Dropout()) 
--- 
---   for w=1, hiddenLayers do
---     perceptronUpper:add(nn.Linear(hiddenUnits,hiddenUnits))   
---     perceptronUpper:add(nn.ReLU())
---     -- perceptronUpper:add(nn.Dropout())
---   end
--- 
---   perceptronUpper:add((nn.Linear(hiddenUnits,output_number)))
--- 
---   local perceptronLower= nn.Sequential()
---   perceptronLower:add((nn.Linear(input_number, hiddenUnits)))
---   perceptronLower:add(nn.ReLU())
---   -- perceptronLower:add(nn.Dropout()) 
--- 
---   for w=1, hiddenLayers do
---     perceptronLower:add(nn.Linear(hiddenUnits,hiddenUnits))   
---     perceptronLower:add(nn.ReLU())
---     -- perceptronLower:add(nn.Dropout())
---   end
--- 
---   perceptronLower:add((nn.Linear(hiddenUnits,output_number)))
--- 
---   local parallel_table = nn.ParallelTable()
---   parallel_table:add(perceptronUpper)
---   parallel_table:add(perceptronLower)
--- 
---   local perceptron = nn.Sequential()
---   perceptron:add((parallel_table))
---   perceptron:add((nn.CosineDistance()))
--- 
---   return perceptron;
--- 
--- end
-
 
 -- Function siameseDistanceApplication()
 function siameseDistanceApplication(current_dataset)
   
  local resultVector = {}
  
+ local cosineFun = nn.CosineDistance();
+ 
  for i=1,(current_dataset[1]):size()[1] do
-  resultVector[#resultVector+1] = myCosineApplication(current_dataset[1][i], current_dataset[2][i])
+  -- resultVector[#resultVector+1] = myCosineApplication(current_dataset[1][i], current_dataset[2][i])
+  
+  resultVector[#resultVector+1] = cosineFun:forward({current_dataset[1][i], current_dataset[2][i]})[1]
  end
   
   return torch.Tensor(resultVector);
@@ -121,7 +88,9 @@ end
 
 -- Function that takes the training set and arrange them for the minibatch splitting
 function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, targetDatasetTrain)
-    
+
+  print("arrangeSetsForMinibatch() start");
+  
    local printPercCount = 0;
    local trainDataset = {};
    local targetDataset = {};
@@ -130,7 +99,12 @@ function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, target
    local rightVect = {}
 	    
    local normTargetDatasetTrain = {}
+   local rate = -1
    for q=1,#first_datasetTrain do
+     
+     rate = round(q*100/#first_datasetTrain,2);
+     io.write(rate.."% ");
+     
      trainDataset[q]={first_datasetTrain[q], second_datasetTrain[q]}	  
      normTargetDatasetTrain[q] = (targetDatasetTrain[q][1]*2) - 1
 
@@ -151,6 +125,7 @@ function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, target
    local newleftTens = leftTens:transpose(1,2); 
    local newrightTens = rightTens:transpose(1,2);
 
+   print("arrangeSetsForMinibatch() end");
 
   return {newleftTens, newrightTens, normTargetDatasetTrain};
 end
@@ -483,7 +458,7 @@ function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_la
       local perceptronUpper = nn.Sequential()
       perceptronUpper:add(nn.Linear(input_number, hiddenUnits))
       perceptronUpper:add(nn.ReLU())
-      print("activation function: ReLU()");
+      print("activation function: ReLU()")
       print("tostring(dropOutFlag) = ".. tostring(dropOutFlag))
       perceptronUpper:add(nn.Dropout()) 
 
@@ -573,6 +548,8 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	print("gradient update completion rate =");
 	for ite = 1, iterations_number do
 	  if MINIBATCH == false then
+	    
+	    -- print("training MINIBATCH == false");
 	    for i=1, #first_datasetTrain do  	    
 	      
 	      currentIndex = permutedTrainIndexVect[i]
@@ -611,6 +588,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	  
 	  else  -- MINIBATCH == true then
 
+		-- print("training MINIBATCH == true");
 	        local output_arrangeSetsForMinibatch = arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, targetDatasetTrain);
 
 		local newleftTens = output_arrangeSetsForMinibatch[1];
@@ -619,8 +597,12 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		
 		-- local input_batch = {newleftTens, newrightTens}			
 
-		local minibatchSize = math.ceil(#first_datasetTrain/MINIBATCH_SPAN_NUMBER);
-		print("minibatchSize = "..minibatchSize);
+		-- local minibatchSize = math.ceil(#first_datasetTrain/MINIBATCH_SPAN_NUMBER);
+		
+		MINIBATCH_SPAN_NUMBER = math.ceil(#first_datasetTrain/MINIBATCH_SIZE);
+		
+		if (ite == 1) then print("MINIBATCH_SIZE = "..MINIBATCH_SIZE); end
+		
 		local minibatch_train = {};
 		local target_train = {};
 		
@@ -634,7 +616,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		      if printPercCount%10==0 then io.write("\n"); io.flush(); end
 		    end
 		    
-		   local output_createMinibatch = createMinibatch(minibatchSize, m, newleftTens, newrightTens, normTargetDatasetTrain);
+		   local output_createMinibatch = createMinibatch(MINIBATCH_SIZE, m, newleftTens, newrightTens, normTargetDatasetTrain);
 		   local current_minibatch_train = output_createMinibatch[1];
 		   local current_target_train = output_createMinibatch[2];
 		    
@@ -668,8 +650,14 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     local predictionTestVect = {}
     local truthVect = {}      
 
+    -- MINIBATCH = false
+    
+    --MINIBATCH=false
+    print("MINIBATCH testing = "..tostring(MINIBATCH));
+        
     if MINIBATCH==false then 
     
+      -- print("testing MINIBATCH == false");
       for i=1, #first_datasetTest do    
 	
 	  thisIndex = permutedTestIndexVect[i]
@@ -690,14 +678,17 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
       
     else -- MINIBATCH == true
     
+	-- print("testing MINIBATCH == true");
 	local output_arrangeSetsForMinibatch = arrangeSetsForMinibatch(first_datasetTest, second_datasetTest, targetDatasetTest);
 
 	local newleftTens = output_arrangeSetsForMinibatch[1];
 	local newrightTens = output_arrangeSetsForMinibatch[2];
 	local normTargetDatasetTest = output_arrangeSetsForMinibatch[3];
 
-	local minibatchSize = math.ceil(#first_datasetTest/MINIBATCH_SPAN_NUMBER);
-	print("minibatchSize = "..minibatchSize);
+	-- local minibatchSize = math.ceil(#first_datasetTest/MINIBATCH_SPAN_NUMBER);
+	MINIBATCH_SPAN_NUMBER = math.ceil(#first_datasetTest/MINIBATCH_SIZE);
+	
+	print("MINIBATCH_SIZE = "..MINIBATCH_SIZE);
 
 	local t = 1;
 	print("MINIBATCH_SPAN_NUMBER = "..MINIBATCH_SPAN_NUMBER);
@@ -705,12 +696,11 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
 	current_model = generalPerceptron
 	
 	-- HACK FOR THE MINIBATCH
-	-- generalPerceptron:remove(2); --remove the cosine distance
-	generalPerceptron.modules[2] = nil
+	generalPerceptron.modules[2] = nil --remove the cosine distance
 
 	for m=1, MINIBATCH_SPAN_NUMBER do  
 		
-	  local output_createMinibatch = createMinibatch(minibatchSize, m, newleftTens, newrightTens, normTargetDatasetTest);
+	  local output_createMinibatch = createMinibatch(MINIBATCH_SIZE, m, newleftTens, newrightTens, normTargetDatasetTest);
 	  local current_minibatch_test = output_createMinibatch[1];
 	  local current_target_test = output_createMinibatch[2];
 	  	    
@@ -805,10 +795,10 @@ function confusion_matrix(predictionTestVect, truthVect, threshold, printValues)
 
   print("TOTAL:")
     print(" FN = "..comma_value(fn).." / "..comma_value(tonumber(fn+tp)).."\t (truth == 1) & (prediction < threshold)");
-    print(" TP = "..comma_value(tp).." / "..comma_value(tonumber(fn+tp)).."\t (truth == 1) & (prediction >= threhsold)\n");
+    print(" TP = "..comma_value(tp).." / "..comma_value(tonumber(fn+tp)).."\t (truth == 1) & (prediction >= threshold)\n");
 	
 
-    print(" FP = "..comma_value(fp).." / "..comma_value(tonumber(fp+tn)).."\t (truth == 0) & (prediction >= threhsold)");
+    print(" FP = "..comma_value(fp).." / "..comma_value(tonumber(fp+tn)).."\t (truth == 0) & (prediction >= threshold)");
     print(" TN = "..comma_value(tn).." / "..comma_value(tonumber(fp+tn)).."\t (truth == 0) & (prediction < threshold)\n");
 
   local continueLabel = true
@@ -834,12 +824,12 @@ function confusion_matrix(predictionTestVect, truthVect, threshold, printValues)
       else print("Matthews correlation coefficient = NOT computable");	end
       
       accuracy = (tp + tn)/(tp + tn +fn + fp)
-      print("accuracy = "..round(accuracy,2).. " = (tp + tn)/(tp + tn +fn + fp)");
+      print("accuracy = "..round(accuracy,2).. " = (tp + tn)/(tp + tn +fn + fp) \t  \t [worst = -1, best =  +1]");
       
       local f1_score = -2
       if (tp+fp+fn)>0 then   
 	f1_score = (2*tp) / (2*tp+fp+fn)
-	print("f1_score = "..round(f1_score,2).." = (2*tp) / (2*tp+fp+fn)");
+	print("f1_score = "..round(f1_score,2).." = (2*tp) / (2*tp+fp+fn) \t [worst = 0, best = 1]");
       else
 	print("f1_score CANNOT be computed because (tp+fp+fn)==0")    
       end
@@ -852,7 +842,7 @@ function confusion_matrix(predictionTestVect, truthVect, threshold, printValues)
       end
       
       local numberOfPredictedOnes = tp + fp;
-      print("numberOfPredictedOnes = (TP + FP) = "..numberOfPredictedOnes.." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp)).."%");
+      print("numberOfPredictedOnes = (TP + FP) = "..comma_value(numberOfPredictedOnes).." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp),2).."%");
       
       io.write("\nDiagnosis: ");
       if (fn >= tp and (fn+tp)>0) then print("too many FN false negatives"); end
@@ -978,9 +968,9 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
       mseVect[p] = math.pow(targetVector[p] - predictionValue[p],2);
       mseSum = mseSum + mseVect[p];
     end  
-    local averageMse = mseSum/((#predictionValue)[1]);
+    local averageMse = mseSum  -- / ((#predictionValue)[1]);
   
-    print("(ite = "..ite..") (minibatch = "..minibatch_number..") average mse = "..round(averageMse,3));
+    -- print("(ite = "..ite..") (minibatch = "..minibatch_number..") average mse = "..round(averageMse,3));
     
 
     generalPerceptron:zeroGradParameters();
@@ -1114,8 +1104,8 @@ require "nn";
  
  io.write(">>> th siamese_nn_toy.lua ");
  MAX_PARAMS = 18
- for i=1,MAX_PARAMS do io.write(" "..tostring(arg[i])); end
- io.write("\n");
+ for i=1,MAX_PARAMS do io.write(" "..tostring(arg[i]).." "); end
+ io.write("\n\n\n");
  io.flush();
  
  
@@ -1131,10 +1121,13 @@ require "nn";
  local dataSource = "Thurman_Miriam"
  local original_tuple_limit = 100
  local balancedFalsePerc = tonumber(arg[6])
+ print("balancedFalsePerc = "..balancedFalsePerc.."%");
  CELL_TYPE_NUMBER = 82
  
  TRAINING_SAMPLES_PERC = tonumber(arg[7])
- print("TRAINING_SAMPLES_PERC = "..TRAINING_SAMPLES_PERC.."%");
+ local percSymbol = "%"
+ if TRAINING_SAMPLES_PERC == -1 then percSymbol="" end 
+ io.write("TRAINING_SAMPLES_PERC = "..TRAINING_SAMPLES_PERC..percSymbol);
 
  print("training segment: "..chromSel.." from "..chrStart_locus.." to "..chrEnd_locus);
  
@@ -1183,17 +1176,21 @@ require "nn";
  print("secondSpan_chrEnd_locus = "..secondSpan_chrEnd_locus);
  end
  
- MINIBATCH = false
  MINIBATCH = tostring(arg[18]) 
- if MINIBATCH == "true" or MINIBATCH == "TRUE" then MINIBATCH = true; end
+ if MINIBATCH == "true" or MINIBATCH == "TRUE" 
+  then MINIBATCH = true;
+ else MINIBATCH = false;
+ end
+ 
+ print("MINIBATCH = "..tostring(MINIBATCH));
  
 if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
 and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL"
 and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT"
-and execution ~=  "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"
-and execution ~=  "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
+and execution ~= "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"
+and execution ~= "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
 and execution ~= "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" 
 and execution ~= "JUST-TESTING"
 and execution ~= "BOOSTING-TESTING" then
@@ -1348,7 +1345,7 @@ if NO_INTERSECTION_BETWEEN_SETS==true then
     end
 end
 
-printTime(noIntersectiontimeStart, " removal of the element, no intersection between training set and test set");
+printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
 
 print("after removal:")
 print("AFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
@@ -1368,6 +1365,12 @@ print("AFTER #targetVector = "..comma_value(#targetVector))
 --     
 --     io.write("chr"..dnaseDataTable[k][1].."_"..dnaseDataTable[k][2].."_"..dnaseDataTable[k][3].."\n");
 -- end
+
+-- -- validation set == training set CHECK
+-- val_dnaseDataTable = dnaseDataTable
+-- val_dataset_firstChromRegion = dataset_firstChromRegion
+-- val_dataset_secondChromRegion = dataset_secondChromRegion
+-- val_targetVector = targetVector
 
 
 
@@ -1402,8 +1405,8 @@ local vectorAccuracy = {}
 
 local stopConditionFlag = false
 
-TRAINING_SAMPLES = math.floor(DATA_SIZE*TRAINING_SAMPLES_PERC/100)
-print("TRAINING_SAMPLES = "..comma_value(TRAINING_SAMPLES));
+-- TRAINING_SAMPLES = math.floor(DATA_SIZE*TRAINING_SAMPLES_PERC/100)
+-- print("TRAINING_SAMPLES = "..comma_value(TRAINING_SAMPLES));
 
 local dropOutFlag = true
 
@@ -1695,6 +1698,7 @@ local renameFileCommand = "mv ./"..tostring(outputFileName).." "..tostring(outpu
   
 printTime(timeStart, "Total duration ");
 
+print(os.date("%c", os.time()));
 print('file: siamese_nn_toy.lua');
 print('\n\n @ @ @ @ @ @ END @ @ @ @ @ @ @ ');
 
