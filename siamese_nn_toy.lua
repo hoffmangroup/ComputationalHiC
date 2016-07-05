@@ -19,8 +19,7 @@ MINIBATCH = false
 PERMUTATION_TRAIN = false
 PERMUTATION_TEST = true
 MINIBATCH_SPAN_NUMBER = 10
--- MINIBATCH_SIZE = 20 -- working
-MINIBATCH_SIZE = 5
+
 
 SUFFICIENT_ACCURACY = 0.9
 
@@ -30,10 +29,18 @@ XAVIER_INITIALIZATION = false
 MOMENTUM_ALPHA = 0.5
 MOMENTUM_FLAG = false
 
-ITERATIONS_CONST = 1000 -- TO REPLACE WITH 1000
-LEARNING_RATE_CONST = 0.001
+ITERATIONS_CONST = 1000 -- ******** 1000 **********
+LEARNING_RATE_CONST = 0.001 -- ******** 0.001 **********
 MAX_POSSIBLE_MSE = 4
 CELL_TYPE_NUMBER = 82
+
+READ_DATA_FROM_DB = true -- ********* true *********
+NO_INTERSECTION_BETWEEN_SETS = true -- ******** true **********
+
+NEW_GRADIENT_MINIBATCH_UPDATE = true -- to set better
+
+require 'optim'
+require '../../torch/NEW_CosineDistance.lua'
 
 
 local globalArrayFPindices = {}
@@ -48,7 +55,9 @@ function siameseDistanceApplication(current_dataset)
  
  local cosineFun = nn.CosineDistance();
  
- for i=1,(current_dataset[1]):size()[1] do
+ local lun = (current_dataset[1]):size()[1]
+ 
+ for i=1,lun do
   -- resultVector[#resultVector+1] = myCosineApplication(current_dataset[1][i], current_dataset[2][i])
   
   resultVector[#resultVector+1] = cosineFun:forward({current_dataset[1][i], current_dataset[2][i]})[1]
@@ -89,7 +98,7 @@ end
 -- Function that takes the training set and arrange them for the minibatch splitting
 function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, targetDatasetTrain)
 
-  print("arrangeSetsForMinibatch() start");
+  -- io.write("arrangeSetsForMinibatch() start :: ");
   
    local printPercCount = 0;
    local trainDataset = {};
@@ -103,7 +112,7 @@ function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, target
    for q=1,#first_datasetTrain do
      
      rate = round(q*100/#first_datasetTrain,2);
-     io.write(rate.."% ");
+     -- if ((rate*10)%10==0) then io.write(rate.."% "); end
      
      trainDataset[q]={first_datasetTrain[q], second_datasetTrain[q]}	  
      normTargetDatasetTrain[q] = (targetDatasetTrain[q][1]*2) - 1
@@ -125,7 +134,7 @@ function arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, target
    local newleftTens = leftTens:transpose(1,2); 
    local newrightTens = rightTens:transpose(1,2);
 
-   print("arrangeSetsForMinibatch() end");
+  -- io.write(" :: arrangeSetsForMinibatch() end");
 
   return {newleftTens, newrightTens, normTargetDatasetTrain};
 end
@@ -450,7 +459,7 @@ end
 function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag)
   
       print("Creatin\' the siamese neural network...");
-      print('hiddenUnits='..hiddenUnits..'\thiddenLayers='..hiddenLayers);
+      print('hiddenUnits = '..hiddenUnits..'\t hiddenLayers = '..hiddenLayers);
 
       local dropout_value = 0.5
       
@@ -510,7 +519,8 @@ function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_la
       -- the pair of outputs
       local generalPerceptron= nn.Sequential()
       generalPerceptron:add(parallel_table)
-      generalPerceptron:add(nn.CosineDistance())
+      -- generalPerceptron:add(nn.CosineDistance())
+      generalPerceptron:add(NEW_CosineDistance());
 
       return generalPerceptron;
 end
@@ -522,7 +532,7 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
       
 	local iterations_number = ITERATIONS_CONST;
 	local learnRate = LEARNING_RATE_CONST;
-
+	
 	local completionRate = 0
 	local loopIterations = 1
 	local trainIndexVect = {}; for i=1, #first_datasetTrain do trainIndexVect[i] = i;  end
@@ -539,6 +549,8 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	local printPercCount = 0;
 	local trainDataset = {};
 	local targetDataset = {};
+	local errorSum = 0;
+	local entroErrorSum = 0;
 	
 	mseSum = 0
 	-- print("mseSum = "..mseSum);
@@ -588,6 +600,8 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 	  
 	  else  -- MINIBATCH == true then
 
+		-- io.write("(ite="..ite..") "); io.flush();
+	    
 		-- print("training MINIBATCH == true");
 	        local output_arrangeSetsForMinibatch = arrangeSetsForMinibatch(first_datasetTrain, second_datasetTrain, targetDatasetTrain);
 
@@ -595,16 +609,15 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		local newrightTens = output_arrangeSetsForMinibatch[2];
 		local normTargetDatasetTrain = output_arrangeSetsForMinibatch[3];
 		
-		-- local input_batch = {newleftTens, newrightTens}			
 
-		-- local minibatchSize = math.ceil(#first_datasetTrain/MINIBATCH_SPAN_NUMBER);
-		
 		MINIBATCH_SPAN_NUMBER = math.ceil(#first_datasetTrain/MINIBATCH_SIZE);
 		
 		if (ite == 1) then print("MINIBATCH_SIZE = "..MINIBATCH_SIZE); end
 		
 		local minibatch_train = {};
 		local target_train = {};
+		local params, gradParams = generalPerceptron:getParameters()
+		local lossSum = 0
 		
 		local c=1
 		for m=1, MINIBATCH_SPAN_NUMBER do  
@@ -616,11 +629,65 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 		      if printPercCount%10==0 then io.write("\n"); io.flush(); end
 		    end
 		    
-		   local output_createMinibatch = createMinibatch(MINIBATCH_SIZE, m, newleftTens, newrightTens, normTargetDatasetTrain);
-		   local current_minibatch_train = output_createMinibatch[1];
-		   local current_target_train = output_createMinibatch[2];
+		    local output_createMinibatch = createMinibatch(MINIBATCH_SIZE, m, newleftTens, newrightTens, normTargetDatasetTrain);
+		    local current_minibatch_train = output_createMinibatch[1];
+		    local current_target_train = output_createMinibatch[2];
 		    
-		   generalPerceptron = gradientUpdateMinibatch(generalPerceptron, current_minibatch_train, current_target_train, learnRate, ite, c);			   
+		    if NEW_GRADIENT_MINIBATCH_UPDATE == true then
+		      
+		      -- local function we give to optim
+		      -- it takes current weights as input, and outputs the loss
+		      -- and the gradient of the loss with respect to the weights
+		      -- gradParams is calculated implicitly by calling 'backward',
+		      -- because the model's weight and bias gradient tensors
+		      -- are simply views onto gradParams
+			  local function feval(params)
+			    gradParams:zero()
+			    local criterion = nn.MSECriterion()
+
+			    aaa = current_minibatch_train
+			    external_model = generalPerceptron
+			    
+			    -- print("newMinibatch_vector["..k.."]")
+			    local thisPrediction = generalPerceptron:forward(current_minibatch_train)
+			    bbb = thisPrediction
+			    ccc = current_target_train
+			    local loss = criterion:forward(thisPrediction, torch.Tensor{current_target_train})
+
+			    lossSum = lossSum + loss
+			    local error_progress = lossSum*100 / (loopIterations*MAX_POSSIBLE_MSE)
+			    
+			    if (ite%10)==0 and (m%5)==0 then
+			      io.write("(iteration="..ite..")(minibatch="..m..") loss = "..round(loss,2).." ")      
+			      io.write("\terror progress = "..round(error_progress,2).."%\n")
+			    end
+			    
+			    local dloss_doutput = criterion:backward(thisPrediction, torch.Tensor{current_target_train})
+			    generalPerceptron:backward(current_minibatch_train, dloss_doutput)
+
+			  return loss,gradParams
+			end
+			optim.sgd(feval, params, {learningRate=LEARN_RATE})
+		      
+		      		      		      
+		    else  -- former gradient minibatch update
+		      
+		      
+			
+		      local output_gradientUpdateMinibatch = gradientUpdateMinibatch(generalPerceptron, current_minibatch_train, current_target_train, learnRate, ite, c);
+		      
+		      generalPerceptron = output_gradientUpdateMinibatch[1];
+		      local currentError = output_gradientUpdateMinibatch[2];
+		      local entroError = output_gradientUpdateMinibatch[3];
+		      errorSum = errorSum + currentError;
+		      entroErrorSum = entroErrorSum + entroError
+		      
+		      if (completionRate*10)%10==0 then
+			  io.write("Cumulative relative MSE sum = "..round(errorSum*100/(loopIterations*MAX_POSSIBLE_MSE),2).."%");
+			  io.write(" cross-entropy error sum = "..round(entroErrorSum*100/(loopIterations*MAX_POSSIBLE_MSE),2).."%\n");
+			  io.flush();
+		      end
+		    end
 		   
 		   c = c + 1
 		   loopIterations = loopIterations + 1
@@ -650,7 +717,7 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     local predictionTestVect = {}
     local truthVect = {}      
 
-    -- MINIBATCH = false
+   -- MINIBATCH = false
     
     --MINIBATCH=false
     print("MINIBATCH testing = "..tostring(MINIBATCH));
@@ -693,10 +760,10 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
 	local t = 1;
 	print("MINIBATCH_SPAN_NUMBER = "..MINIBATCH_SPAN_NUMBER);
 	
-	current_model = generalPerceptron
+	current_model = generalPerceptron:clone()
 	
 	-- HACK FOR THE MINIBATCH
-	generalPerceptron.modules[2] = nil --remove the cosine distance
+	current_model.modules[2] = nil --remove the cosine distance
 
 	for m=1, MINIBATCH_SPAN_NUMBER do  
 		
@@ -707,7 +774,7 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
 	  -- local thisPredictionVector = generalPerceptron:forward(current_minibatch_test);
 	  
 	  -- HACK FOR THE MINIBATCH
-	  local doubleTensorPreCosine = generalPerceptron:forward(current_minibatch_test);
+	  local doubleTensorPreCosine = current_model:forward(current_minibatch_test);
 	  local thisPredictionVector = siameseDistanceApplication(doubleTensorPreCosine);
 
 	  
@@ -862,52 +929,6 @@ end
 
 
 
--- FUNCTION subrange
-function subrange(t, first, last)
-  local sub = {}
-  for i=first,last do
-    sub[#sub + 1] = t[i]
-  end
-  return sub
-end
-
--- Permutations
--- tab = {1,2,3,4,5,6,7,8,9,10}
--- permute(tab, 10, 10)
-function permute(tab, n, count)
-      n = n or #tab
-      for i = 1, count or n do
-        local j = math.random(i, n)
-        tab[i], tab[j] = tab[j], tab[i]
-      end
-      return tab
-end
-
--- from sam_lie
--- Compatible with Lua 5.0 and 5.1.
--- Disclaimer : use at own risk especially for hedge fund reports :-)
-
----============================================================
--- add comma to separate thousands
--- 
-function comma_value(amount)
-  local formatted = amount
-  while true do  
-    formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-    if (k==0) then
-      break
-    end
-  end
-  return formatted
-end
-
--- round a real value
-function round(num, idp)
-  local mult = 10^(idp or 0)
-  return math.floor(num * mult + 0.5) / mult
-end
-
-
 -- -- training
 -- function gradientUpdate_minibatchBIS(perceptron, dataset, target, learningRate, ite, minibatch_number)
 -- 
@@ -954,23 +975,33 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
     local target_array_tensors = changeSignOfArray(targetVector)  
     local gradientWrtOutput = torch.Tensor(target_array_tensors)   
     
-    local predictionValue = generalPerceptron:forward(dataset_vector)
+    local normPredictionValue = (generalPerceptron:forward(dataset_vector)+1)/2
+    local normTargetVector = {}
+    for u=1,#targetVector do normTargetVector[u]=(targetVector[u]+1)/2; end
     
     local mseVect = {}
     local mseSum = 0
     
-    -- print("((dataset_vector[1]):size())[2] = "..((dataset_vector[1]):size())[2]);
-    -- print("(#predictionValue)[1] = ".. (#predictionValue)[1])
-    -- print("predictionValue:size()[1] = "..predictionValue:size()[1])
+    local entroErrorVect = {}
+    local entroErrorSum = 0
     
-    for p=1,predictionValue:size()[1] do
-     -- print('predictionValue['..p..'] = '..predictionValue[p]);
-      mseVect[p] = math.pow(targetVector[p] - predictionValue[p],2);
+--     print("((dataset_vector[1]):size())[2] = "..((dataset_vector[1]):size())[2]);
+--     print("(#normPredictionValue)[1] = ".. (#normPredictionValue)[1])
+--     print("normPredictionValue:size()[1] = "..normPredictionValue:size()[1].."\n")
+    
+    for p=1,normPredictionValue:size()[1] do
+     -- print('normPredictionValue['..p..'] = '..normPredictionValue[p]);
+      mseVect[p] = math.pow(normTargetVector[p] - normPredictionValue[p],2);
       mseSum = mseSum + mseVect[p];
+      
+      io.write("(p="..p..") normPredictionValue["..p.."] = "..round(normPredictionValue[p],2).."\t normTargetVector["..p.."] = "..round(normTargetVector[p],2).."\t");
+      entroErrorVect[p] = -(math.log(normPredictionValue[p])*normTargetVector[p]); -- TO CHECK
+    --  print("entroErrorVect["..p.."] = "..round(entroErrorVect[p]));
+      entroErrorSum = entroErrorSum + entroErrorVect[p]; -- TO CHECK
     end  
-    local averageMse = mseSum  -- / ((#predictionValue)[1]);
+    -- local averageMse = mseSum  -- / ((#normPredictionValue)[1]);
   
-    -- print("(ite = "..ite..") (minibatch = "..minibatch_number..") average mse = "..round(averageMse,3));
+    -- print("(ite = "..ite..") (minibatch = "..minibatch_number..") average mse = "..round(mseSum,3));
     
 
     generalPerceptron:zeroGradParameters();
@@ -979,9 +1010,9 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
     
 --     current_model = generalPerceptron
 --     current_dataset = dataset_vector
---     current_prediction = predictionValue
+--     current_prediction = normPredictionValue
 
-    return generalPerceptron;
+    return {generalPerceptron, mseSum, entroErrorSum};
 end
 
 VERBOSE = false
@@ -1103,7 +1134,7 @@ require "nn";
  require "../../_project/bin/utils.lua"
  
  io.write(">>> th siamese_nn_toy.lua ");
- MAX_PARAMS = 18
+ MAX_PARAMS = 19
  for i=1,MAX_PARAMS do io.write(" "..tostring(arg[i]).." "); end
  io.write("\n\n\n");
  io.flush();
@@ -1127,7 +1158,7 @@ require "nn";
  TRAINING_SAMPLES_PERC = tonumber(arg[7])
  local percSymbol = "%"
  if TRAINING_SAMPLES_PERC == -1 then percSymbol="" end 
- io.write("TRAINING_SAMPLES_PERC = "..TRAINING_SAMPLES_PERC..percSymbol);
+ io.write("TRAINING_SAMPLES_PERC = "..TRAINING_SAMPLES_PERC..percSymbol.." ");
 
  print("training segment: "..chromSel.." from "..chrStart_locus.." to "..chrEnd_locus);
  
@@ -1181,8 +1212,17 @@ require "nn";
   then MINIBATCH = true;
  else MINIBATCH = false;
  end
+
+print("MINIBATCH = "..tostring(MINIBATCH));
  
- print("MINIBATCH = "..tostring(MINIBATCH));
+-- MINIBATCH_SIZE = 20 -- working
+MINIBATCH_SIZE = tonumber(arg[19])
+print("MINIBATCH_SIZE = ".. MINIBATCH_SIZE)
+
+print("ITERATIONS_CONST = "..ITERATIONS_CONST); 
+print("LEARNING_RATE_CONST = "..LEARNING_RATE_CONST);
+
+ 
  
 if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
@@ -1202,15 +1242,15 @@ end
 
 local regionLabel = chromSel.."-"..chrStart_locus.."-"..chrEnd_locus;
 
-READ_DATA_FROM_DB = true
 
-local dataset_firstChromRegion = {}
-local dataset_secondChromRegion = {}
-local targetVector = {}
 
-local val_dataset_firstChromRegion = {}
-local val_dataset_secondChromRegion = {}
-local val_targetVector = {}
+ dataset_firstChromRegion = {}
+ dataset_secondChromRegion = {}
+ targetVector = {}
+
+ val_dataset_firstChromRegion = {}
+ val_dataset_secondChromRegion = {}
+ val_targetVector = {}
 local dnaseDataTable_only_IDs_training = {}
 local dnaseDataTable_only_IDs_val = {}
 
@@ -1295,27 +1335,34 @@ else
   val_dataset_secondChromRegion = second_datasetGeneral
   val_targetVector = targetDatasetGeneral
   
+  -- TO REMOVE
+  -- dataset_firstChromRegion = val_dataset_firstChromRegion
+  -- dataset_secondChromRegion = val_dataset_secondChromRegion
+  -- targetVector = val_targetVector 
+  
   
   print("> > > > Data were read from files,  not from PostgreSQL < < < <");
 
   
 end
 
+
 local noIntersectiontimeStart = os.time()
-NO_INTERSECTION_BETWEEN_SETS = true;
+
+--	REMOVING DATA FROM THE VALIDATION SET
 
 if NO_INTERSECTION_BETWEEN_SETS==true then
 
     -- Remove the test set elements from the training set
     print("Remove the test set elements from the training set");
     print("before removal:")
-    print("BEFORE #dnaseDataTable = "..comma_value(#dnaseDataTable))
-    print("BEFORE #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
-    print("BEFORE #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
-    print("BEFORE #targetVector = "..comma_value(#targetVector))
+    print("BEFORE #val_dnaseDataTable = "..comma_value(#val_dnaseDataTable))
+    print("BEFORE #val_dataset_firstChromRegion = "..comma_value(#val_dataset_firstChromRegion))
+    print("BEFORE #val_dataset_secondChromRegion = "..comma_value(#val_dataset_secondChromRegion))
+    print("BEFORE #val_targetVector = "..comma_value(#val_targetVector))
 
     local index = 1
-    local _size = #val_dnaseDataTable  
+    local _size = #dnaseDataTable  
     local kRate = 1
     for k=1,_size do
       
@@ -1324,7 +1371,7 @@ if NO_INTERSECTION_BETWEEN_SETS==true then
 	    io.write(kRate.."% "); io.flush(); 
 	end
       
-	local output_contains = chromRegionTableContains(dnaseDataTable, val_dnaseDataTable[k])
+	local output_contains = chromRegionTableContains(val_dnaseDataTable, dnaseDataTable[k])
 	local label = output_contains[1]
 	--print("label = "..tostring(label))
 	local position = output_contains[2]
@@ -1332,26 +1379,101 @@ if NO_INTERSECTION_BETWEEN_SETS==true then
 	if label  then
 	  io.write("(k="..comma_value(k).." remove)\t");
 	  io.flush();
-	  table.remove(dnaseDataTable, position);
-	  table.remove(dataset_firstChromRegion, position);
-	  table.remove(dataset_secondChromRegion, position);
-	  table.remove(targetVector, position);
+	  table.remove(val_dnaseDataTable, position);
+	  table.remove(val_dataset_firstChromRegion, position);
+	  table.remove(val_dataset_secondChromRegion, position);
+	  table.remove(val_targetVector, position);
 	  index = 1
-	  -- print(" #dnaseDataTable = "..#dnaseDataTable.."\tindex = "..index.."\t_size = ".._size)
+
+
 	else
 	  --io.write("\n");
 	  index = index +1 
 	end  	
     end
+    
+    
+  printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
+
+  print("after removal:")
+  print("AFTER #val_dnaseDataTable = "..comma_value(#val_dnaseDataTable))
+  print("AFTER #val_dataset_firstChromRegion = "..comma_value(#val_dataset_firstChromRegion))
+  print("AFTER #val_dataset_secondChromRegion = "..comma_value(#val_dataset_secondChromRegion))
+  print("AFTER #val_targetVector = "..comma_value(#val_targetVector))
+      
 end
 
-printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
 
-print("after removal:")
-print("AFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
+-- -- TO REMOVE
+-- dnaseDataTable = val_dnaseDataTable
+-- dataset_firstChromRegion = val_dataset_firstChromRegion
+-- dataset_secondChromRegion = val_dataset_secondChromRegion
+-- targetVector = val_targetVector
+
+
+
+print("\nAFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
 print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
-print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
+print("AFTER #val_dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
 print("AFTER #targetVector = "..comma_value(#targetVector))
+
+--	REMOVING DATA FROM THE TRAINING SET
+--
+-- if NO_INTERSECTION_BETWEEN_SETS==true then
+-- 
+--     -- Remove the test set elements from the training set
+--     print("Remove the test set elements from the training set");
+--     print("before removal:")
+--     print("BEFORE #dnaseDataTable = "..comma_value(#dnaseDataTable))
+--     print("BEFORE #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
+--     print("BEFORE #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
+--     print("BEFORE #targetVector = "..comma_value(#targetVector))
+-- 
+--     local index = 1
+--     local _size = #val_dnaseDataTable  
+--     local kRate = 1
+--     for k=1,_size do
+--       
+-- 	kRate=(k*100/_size)
+-- 	if (kRate*10)%10==0 then 
+-- 	    io.write(kRate.."% "); io.flush(); 
+-- 	end
+--       
+-- 	local output_contains = chromRegionTableContains(dnaseDataTable, val_dnaseDataTable[k])
+-- 	local label = output_contains[1]
+-- 	--print("label = "..tostring(label))
+-- 	local position = output_contains[2]
+-- 	-- print("position = "..position)
+-- 	if label  then
+-- 	  io.write("(k="..comma_value(k).." remove)\t");
+-- 	  io.flush();
+-- 	  table.remove(dnaseDataTable, position);
+-- 	  table.remove(dataset_firstChromRegion, position);
+-- 	  table.remove(dataset_secondChromRegion, position);
+-- 	  table.remove(targetVector, position);
+-- 	  index = 1
+-- 
+-- 
+-- 	else
+-- 	  --io.write("\n");
+-- 	  index = index +1 
+-- 	end  	
+--     end
+--     
+--     
+--   printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
+-- 
+--   print("after removal:")
+--   print("AFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
+--   print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
+--   print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
+--   print("AFTER #targetVector = "..comma_value(#targetVector))
+--       
+-- end
+
+
+
+
 -- 
 -- print("\n#val_dnaseDataTable = "..#val_dnaseDataTable)
 -- for k=1,#val_dnaseDataTable do
@@ -1423,11 +1545,15 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
   local maxHiddenUnits = 50
 
   local hiddenUnitsVect = {}
-  hiddenUnitsVect[#hiddenUnitsVect+1] = 4
-  hiddenUnitsVect[#hiddenUnitsVect+1] = 50
-  hiddenUnitsVect[#hiddenUnitsVect+1] = 100
-  hiddenUnitsVect[#hiddenUnitsVect+1] = 150
-  hiddenUnitsVect[#hiddenUnitsVect+1] = 200
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 400 -- 4
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 450 -- 50
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 500 -- 100  
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 550 -- 200
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 600 -- 300
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 650 -- 300
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 700 -- 200
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 750 -- 300
+  hiddenUnitsVect[#hiddenUnitsVect+1] = 800 -- 300
 
   for hiddenLayers=1,maxHiddenLayers do
     for _,v in ipairs(hiddenUnitsVect) do
@@ -1464,6 +1590,13 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	
         vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
 	vectorMCC[#vectorMCC+1] = applicationOutput[3];	
+	
+	local currentMCC = applicationOutput[3]
+	io.write(("currentMCC = "..round(currentMCC,2));
+	io.write(" hiddenUnits = "..hiddenUnits);
+	io.write(" hiddenLayers = "..hiddenLayers.."\n");
+	io.flush();
+	
 	-- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
 	printVector(vectorMCC, "PARTIAL vectorMCC");
 	
@@ -1527,8 +1660,8 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
   
 elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
   
-      hiddenUnits = 100
-      hiddenLayers = 1
+      hiddenUnits = 100 -- USUALLY 100
+      hiddenLayers = 1 -- USUALLY 1
 
       local input_number = CELL_TYPE_NUMBER
       local output_layer_number = CELL_TYPE_NUMBER
@@ -1555,12 +1688,18 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
       
       local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
       
+      local currentMCC = applicationOutput[3]
+      io.write(("currentMCC = "..round(currentMCC,2));
+      io.write(" hiddenUnits = "..hiddenUnits);
+      io.write(" hiddenLayers = "..hiddenLayers.."\n");
+      io.flush();
+      
       printTime(timeSiameseNeuralNetwork_application, "Siamese neural network application duration ");
 
       
 elseif execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
       
-      hiddenUnits = 100
+      hiddenUnits = 200  --  it was 100
       hiddenLayers = 1
 
       local input_number = CELL_TYPE_NUMBER
