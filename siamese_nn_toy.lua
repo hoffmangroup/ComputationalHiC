@@ -370,7 +370,7 @@ function metrics_ROC_AUC_computer(completePredValueVector, truthVector)
 	-- printVector(sortedRecallVett, "sortedRecallVett");
 	
 	local area_precision_recall = round((areaNew(sortedPrecisionVett, sortedRecallVett)-1)*100, 2) ; -- UNDERSTAND WHY -1 ???
-	print("(beta) metrics area_precision_recall = "..area_precision_recall.."%");	
+	print("(beta) metrics AUPR area_precision_recall = "..area_precision_recall.."%");	
 
  	if area_precision_recall < 0 then io.stderr:write('ERROR: PrecisionRecallArea < 0%, problem ongoing'); return; end
  	if area_precision_recall > 100 then io.stderr:write('ERROR: PrecisionRecallArea > 100%, problem ongoing;'); return; end
@@ -1769,7 +1769,7 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 	local currentMCC = applicationOutput[3]
 	local currentAccuracy = applicationOutput[1]
 	io.write("currentMCC = "..signedValueFunction(round(currentMCC,3)));
-	io.write(" currentAccuracy = "..signedValueFunction(round(currentAccuracy,3)));
+	io.write(" currentAccuracy = "..round(currentAccuracy,3));
 	io.write(" hiddenUnits = "..hiddenUnits);
 	io.write(" hiddenLayers = "..hiddenLayers.."\n");
 	io.flush();
