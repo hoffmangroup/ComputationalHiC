@@ -16,7 +16,7 @@
 
 L2_WEIGHT = 0.000001;
 L1_WEIGHT = 0.005;
-REGULARIZATION = false;
+REGULARIZATION = true;
 MINIBATCH = false;
 NEW_OPTIM_GRADIENT_MINIBATCH = true; -- to set better
 
@@ -50,6 +50,134 @@ require '../../torch/NEW_CosineDistance.lua'
 local globalArrayFPindices = {}
 local globalArrayFPvalues = {}
 globalMinFPplusFN_vector = {}
+
+--
+-- Function that does not apply the regularization only to the three 
+
+-- This function does NOT apply the regularization to the feature indices of the four cell types shared by DNase dataset and Hi-C dataset, except the feature_index one:
+-- GM12878_dnaseCellType = 26
+-- HUVEC_dnaseCellType = 55
+-- IMR90_dnaseCellType = 57
+-- k562_dnaseCellType = 61
+-- 
+-- 
+-- - hidden_units = number of hidden units of the neural network
+-- - input_number = number of input units of the neural network
+-- The rest is the same of sgd.
+--
+--
+function optim.sgd_3cellTypesHighlight(opfunc, x, config, state, feature_index, hidden_units, input_number)
+  
+  -- io.write("feature_index = "..feature_index.."\thidden_units = "..hidden_units.."\tinput_number = "..input_number)
+  io.flush()
+  
+   -- (0) get/update state
+   local config = config or {}
+   local state = state or config
+   local lr = config.learningRate or 1e-3
+   local lrd = config.learningRateDecay or 0
+   local wd = config.weightDecay or 0
+   local mom = config.momentum or 0
+   local damp = config.dampening or mom
+   local nesterov = config.nesterov or false
+   local lrs = config.learningRates
+   local wds = config.weightDecays
+   state.evalCounter = state.evalCounter or 0
+   local nevals = state.evalCounter
+   assert(not nesterov or (mom > 0 and damp == 0), "Nesterov momentum requires a momentum and zero dampening")
+
+   -- (1) evaluate f(x) and df/dx
+   local fx,dfdx = opfunc(x)
+   
+   -- print("hidden_units = "..hidden_units);
+   -- print("input_number = "..input_number);
+   
+   -- new part
+   local original_dfdx = dfdx:clone()
+
+   -- (2) weight decay with single or individual parameters
+   if wd ~= 0 then
+     
+	  dfdx:add(wd, x)
+	  
+	    local idp = 5
+	    if PRINT_ONCE then  io.write("not-regularized indices = "); end
+	    for i=0,hidden_units-1 do
+	      -- io.write("(i="..i..") ")
+	      local index_GM12878 = GM12878_dnaseCellType+(i*input_number) 
+	      local index_HUVEC = HUVEC_dnaseCellType+(i*input_number)
+	      local index_IMR90 = IMR90_dnaseCellType+(i*input_number)
+	      local index_k562 = k562_dnaseCellType+(i*input_number)
+	      if PRINT_ONCE then 
+		
+		if feature_index~=GM12878_dnaseCellType then io.write("["..index_GM12878.."]\t") end	      
+		if feature_index~=HUVEC_dnaseCellType then io.write("["..index_HUVEC.."]\t") end	      
+		if feature_index~=IMR90_dnaseCellType then io.write("["..index_IMR90.."]\t") end	      
+		if feature_index~=k562_dnaseCellType then io.write("["..index_k562.."]\t") end
+		io.write("\n")
+		io.flush();
+		if i%15==0 then io.write("\n"); end
+     
+	      end
+	      
+	      if feature_index~=GM12878_dnaseCellType then dfdx[index_GM12878] = original_dfdx[index_GM12878] end	      
+	      if feature_index~=HUVEC_dnaseCellType then dfdx[index_HUVEC] = original_dfdx[index_HUVEC] end	      
+	      if feature_index~=IMR90_dnaseCellType then dfdx[index_IMR90] = original_dfdx[index_IMR90] end	      
+	      if feature_index~=k562_dnaseCellType then dfdx[index_k562] = original_dfdx[index_k562] end
+	      
+	    end
+	    
+	    if PRINT_ONCE then 
+	      io.write("\n")
+	      io.flush()
+	    end
+	    
+	    PRINT_ONCE = false
+
+    elseif wds then
+      if not state.decayParameters then
+         state.decayParameters = torch.Tensor():typeAs(x):resizeAs(dfdx)
+      end
+      state.decayParameters:copy(wds):cmul(x)
+      dfdx:add(state.decayParameters)
+   end
+
+   -- (3) apply momentum
+   if mom ~= 0 then
+      if not state.dfdx then
+         state.dfdx = torch.Tensor():typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
+      else
+         state.dfdx:mul(mom):add(1-damp, dfdx)
+      end
+      if nesterov then
+         dfdx:add(mom, state.dfdx)
+      else
+         dfdx = state.dfdx
+      end
+   end
+
+   -- (4) learning rate decay (annealing)
+   local clr = lr / (1 + nevals*lrd)
+   
+   -- (5) parameter update with single or individual learning rates
+   if lrs then
+      if not state.deltaParameters then
+         state.deltaParameters = torch.Tensor():typeAs(x):resizeAs(dfdx)
+      end
+      state.deltaParameters:copy(lrs):cmul(dfdx)
+      x:add(-clr, state.deltaParameters)
+   else
+      x:add(-clr, dfdx)
+   end
+
+   -- (6) update evaluation counter
+   state.evalCounter = state.evalCounter + 1
+
+   
+   -- return x*, f(x) before optimization
+   return x,{fx}
+end
+    
 
 
 -- Function siameseDistanceApplication()
@@ -289,7 +417,7 @@ function metrics_ROC_AUC_computer(completePredValueVector, truthVector)
 	-- printVector(completePredValueVector, "completePredValueVector");
 	-- printVector(truthVector, "truthVector");
 	-- os.exit();
-	
+	 
 	
 	if checkAllZeros(truthVector)==true then
 	  
@@ -364,24 +492,16 @@ function metrics_ROC_AUC_computer(completePredValueVector, truthVector)
 	-- printVector(recall_vect, "recall_vect");
 	
 	require '../../torch/lib/sort_two_arrays_from_first.lua';
-	sortedPrecisionVett, sortedRecallVett = sort_two_arrays_from_first(precision_vect, recall_vect, #precision_vect)
+	sortedRecallVett, sortedPrecisionVett = sort_two_arrays_from_first(recall_vect, precision_vect,  #precision_vect)
 	
 	-- printVector(sortedPrecisionVett, "sortedPrecisionVett");
 	-- printVector(sortedRecallVett, "sortedRecallVett");
 	
-	local area_precision_recall = round((areaNew(sortedPrecisionVett, sortedRecallVett)-1)*100, 2) ; -- UNDERSTAND WHY -1 ???
-	print("(beta) metrics AUPR area_precision_recall = "..area_precision_recall.."%");	
+	local area_precision_recall = round((areaNew(sortedRecallVett, sortedPrecisionVett)-1)*100, 2) ; -- UNDERSTAND WHY -1 ???
+	print("metrics AUPR area_precision_recall = "..area_precision_recall.."%");	
 
  	if area_precision_recall < 0 then io.stderr:write('ERROR: PrecisionRecallArea < 0%, problem ongoing'); return; end
- 	if area_precision_recall > 100 then io.stderr:write('ERROR: PrecisionRecallArea > 100%, problem ongoing;'); return; end
-	
-
--- 	timeNewAreaFinish = os.time();
--- 	durationNewAreaTotal = timeNewAreaFinish - timeNewAreaStart;
--- 	print('\ntotal duration of the new area_roc metrics ROC_AUC_computer function: '.. tonumber(durationNewAreaTotal).. ' seconds');
--- 	io.flush();
--- 	print('total duration of the new area_roc metrics ROC_AUC_computer function: '..string.format("%.2d hours, %.2d minutes, %.2d seconds", durationNewAreaTotal/(60*60), durationNewAreaTotal/60%60, durationNewAreaTotal%60));
--- 	io.flush();
+ 	if area_precision_recall > 100 then io.stderr:write('ERROR: PrecisionRecallArea > 100%, problem ongoing;'); return; end	
 	
 	printTime(timeNewAreaStart0, " the new area_roc metrics ROC_AUC_computer function");
 
@@ -703,9 +823,10 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 			end
 			-- optim.sgd(feval, params, config) 
 			local state = nil
-			optim.sgd_NEW(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, input_number)
-		      
-		      		      		      
+			-- optim.sgd_NEW(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, input_number)
+			
+			optim.sgd_3cellTypesHighlight(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, CELL_TYPE_NUMBER)
+			  
 		    else  -- former gradient minibatch update
 		      
 		      
@@ -757,7 +878,7 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     
     --MINIBATCH=false
     print("MINIBATCH testing = "..tostring(MINIBATCH));
-        
+    
     if MINIBATCH==false then 
     
       -- print("testing MINIBATCH == false");
@@ -767,6 +888,9 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
 	  --if PERMUTATION_TEST == true then io.write("(thisIndex = "..thisIndex..") "); io.flush();  end
 	  
 	  local testDataset={first_datasetTest[thisIndex], second_datasetTest[thisIndex]}
+	  
+	  -- print("#testDataset =".. #testDataset);
+	  	  
 	  local testPredictionValue = generalPerceptron:forward(testDataset)[1];
 	  -- print("generalPerceptron:forward(testDataset)[1] =\t "..generalPerceptron:forward(testDataset)[1]);
 	  -- print("generalPerceptron:forward(testDataset)[2] =\t "..generalPerceptron:forward(testDataset)[2]);
@@ -826,11 +950,13 @@ function testModel(first_datasetTest, second_datasetTest, targetDatasetTest, gen
     
     end
 
-    local printValues = true;
+    local printValues = false;
     
     local timeConfMat = os.time();
     output_confusion_matrix = confusion_matrix(predictionTestVect, truthVect, threshold, printValues);    
     printTime(timeConfMat, "Confusion matrix computation ");
+    
+    metrics_ROC_AUC_computer(predictionTestVect, truthVect)
     
     lastAccuracy = output_confusion_matrix[1];
     globalArrayFPindices = output_confusion_matrix[2];
@@ -965,7 +1091,7 @@ function confusion_matrix(predictionTestVect, truthVect, threshold, printValues)
 --       end
       
       local numberOfPredictedOnes = tp + fp;
-      print("\n\nnumberOfPredictedOnes = (TP + FP) = "..comma_value(numberOfPredictedOnes).." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp),2).."%");
+     -- print("\n\nnumberOfPredictedOnes = (TP + FP) = "..comma_value(numberOfPredictedOnes).." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp),2).."%");
       
       io.write("\nDiagnosis: ");
       if (fn >= tp and (fn+tp)>0) then print("too many FN false negatives"); end
@@ -1299,6 +1425,8 @@ end
 
 local hicCellTypeSpecific = tostring(arg[21]);
 print("hicCellTypeSpecific = "..hicCellTypeSpecific);
+
+
 if hicCellTypeSpecific~="-1"
 and hicCellTypeSpecific~=-1
 and hicCellTypeSpecific~="GM12878"
@@ -1314,7 +1442,20 @@ and hicCellTypeSpecific~="NHEK" then
   os.exit();  
 end
 
-dnaseCellTypeToHighlightNumber = tonumber(arg[22]);
+dnaseCellTypeToHighlightNumber = tonumber(arg[22]); -- TO BE REMOVED
+
+-- Number of the cell type in the DNase cell type list
+GM12878_dnaseCellType = 26
+HUVEC_dnaseCellType = 55
+IMR90_dnaseCellType = 57
+k562_dnaseCellType = 61
+
+if hicCellTypeSpecific~="GM12878" then dnaseCellTypeToHighlightNumber = GM12878_dnaseCellType end
+if hicCellTypeSpecific~="HUVEC" then dnaseCellTypeToHighlightNumber = HUVEC_dnaseCellType end
+if hicCellTypeSpecific~="IMR90" then dnaseCellTypeToHighlightNumber = IMR90_dnaseCellType end
+if hicCellTypeSpecific~="k562" then dnaseCellTypeToHighlightNumber = k562_dnaseCellType end
+
+
 dnaseCellTypeToHighlightName = "";
 if dnaseCellTypeToHighlightNumber>=1 and dnaseCellTypeToHighlightNumber<=CELL_TYPE_NUMBER then
   
@@ -1329,6 +1470,7 @@ else
     print("Error: the dnaseCellTypeToHighlightNumber = "..dnaseCellTypeToHighlightNumber.." is not in the 1- "..CELL_TYPE_NUMBER.." interval. The program will stop");
   os.exit();  
 end
+
 
 if tonumber(dnaseCellTypeToHighlightNumber)~=-1 then
   NO_INTERSECTION_BETWEEN_SETS = false
@@ -1346,7 +1488,7 @@ end
 
 -- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
  
-if execution ~= "OPTIMIZATION-TRAINING-HELD-OUT" 
+if execution ~=  "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
 and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL"
 and execution ~= "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT"
@@ -1364,15 +1506,16 @@ end
 
 local regionLabel = chromSel.."-"..chrStart_locus.."-"..chrEnd_locus;
 
+INDEPENDENT_VALIDATION_DATASET_READING = true
 
 
- dataset_firstChromRegion = {}
- dataset_secondChromRegion = {}
- targetVector = {}
+dataset_firstChromRegion = {}
+dataset_secondChromRegion = {}
+targetVector = {}
 
- val_dataset_firstChromRegion = {}
- val_dataset_secondChromRegion = {}
- val_targetVector = {}
+val_dataset_firstChromRegion = {}
+val_dataset_secondChromRegion = {}
+val_targetVector = {}
 local dnaseDataTable_only_IDs_training = {}
 local dnaseDataTable_only_IDs_val = {}
 
@@ -1380,6 +1523,8 @@ local dnaseDataTable = {}
 local val_dnaseDataTable = {}
 
 if READ_DATA_FROM_DB == true then
+  
+  if execution ~= "JUST-TESTING" then
   
   experimentDetails = "==> Experiment details:\n "..regionLabel.."\n";
   experimentDetails = experimentDetails .." tuple_limit = "..tuple_limit.."\n";
@@ -1400,20 +1545,19 @@ if READ_DATA_FROM_DB == true then
   
   dnaseDataTable_only_IDs_training = unbal_data_read_output[8];
       
-  if balancedDatasetSize==0 then
-	print("No true interactions in the training set: the program is going to stop");
-	os.exit();
-  end
+    if balancedDatasetSize==0 then
+	  print("No true interactions in the training set: the program is going to stop");
+	  os.exit();
+    end
       
   dataset_firstChromRegion = unbal_data_read_output[3];
   dataset_secondChromRegion = unbal_data_read_output[4];
   targetVector = unbal_data_read_output[5];
-  
-  INDEPENDENT_VALIDATION_DATASET_READING = true
 
+  end
   
   -- READIN' THE VALIDATION SET
-  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
+  if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" or execution == "JUST-TESTING"  then
     
     if INDEPENDENT_VALIDATION_DATASET_READING == true then
       
@@ -1421,6 +1565,7 @@ if READ_DATA_FROM_DB == true then
       
       -- We don't want to exclude the 
       local thisHicCellTypeToExclude = -1
+      
       
       local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, thisHicCellTypeToExclude, hicCellTypeSpecific);
       
@@ -1525,7 +1670,7 @@ end
 local noIntersectiontimeStart = os.time()
 
 
-if hicCellTypeSpecific~=-1 and hicCellTypeSpecific~="-1" then
+if (hicCellTypeSpecific~=-1 and hicCellTypeSpecific~="-1") or execution=="JUST-TESTING" then
   NO_INTERSECTION_BETWEEN_SETS = false
 end
 
@@ -1593,7 +1738,7 @@ end
 
 print("\nAFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
 print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
-print("AFTER #val_dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
+print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
 print("AFTER #targetVector = "..comma_value(#targetVector))
 
 --	REMOVING DATA FROM THE TRAINING SET
@@ -1711,6 +1856,8 @@ local stopConditionFlag = false
 
 local dropOutFlag = true
 
+input_number = -1
+
 if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
   
 
@@ -1818,7 +1965,7 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT" or execution == "OPTIMIZATION-T
 
 	print("$$$ K-fold cross validation finished, general rates $$$")
 	-- metrics_ROC_AUC_computer(globalPredictionVector, truthVector)
-	local printValues = true
+	local printValues = false
 	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threshold, printValues)  
 
 	 vectorAccuracy[#vectorAccuracy+1] = output_confusion_matrix[1]
@@ -1907,7 +2054,7 @@ elseif execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
 
 	print("$$$ K-fold cross validation finished, general rates $$$");
 	-- metrics_ROC_AUC_computer(globalPredictionVector, truthVector)
-	local printValues = true;
+	local printValues = false;
 	local output_confusion_matrix = confusion_matrix(globalPredictionVector, truthVector, threshold, printValues)  
 	
 	
@@ -1915,9 +2062,9 @@ elseif execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" then
 
 elseif execution == "JUST-TESTING" then
 
- first_datasetTest = dataset_firstChromRegion
- second_datasetTest = dataset_secondChromRegion
- targetDatasetTest = targetVector
+  print("#val_dnaseDataTable = ".. #val_dnaseDataTable)
+  print("#val_dataset_firstChromRegion =".. #val_dataset_firstChromRegion)
+  print("#val_dataset_secondChromRegion ="..#val_dataset_secondChromRegion)
  
   print("modelFile to read: ".. (trainedModelFile));
   io.flush();
@@ -1925,9 +2072,12 @@ elseif execution == "JUST-TESTING" then
  
   print("\n\n\n : : : : : EXTERNAL TEST  : : : : : ");
 
-
+--   local first_datasetTest = val_dataset_firstChromRegion
+--   local second_datasetTest = val_dataset_secondChromRegion
+--   local targetDatasetTest = val_targetVector
+  
   local timeTestModel = os.time();
-  local testModelOutput = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, loadedPerceptron)
+  local testModelOutput = testModel(val_dataset_firstChromRegion, val_dataset_secondChromRegion, val_targetVector, loadedPerceptron)
   printTime(timeTestModel, "Testing duration ");
   
 elseif execution == "BOOSTING-TESTING" then
