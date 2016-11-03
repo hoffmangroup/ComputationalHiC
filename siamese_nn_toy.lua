@@ -51,6 +51,56 @@ local globalArrayFPindices = {}
 local globalArrayFPvalues = {}
 globalMinFPplusFN_vector = {}
 
+-- Number of the cell type in the DNase cell type list
+GM12878_dnaseCellType = 26
+HUVEC_dnaseCellType = 55
+IMR90_dnaseCellType = 57
+k562_dnaseCellType = 61
+
+-- function that retrieves the column name and number from the cell type
+function retrieveCellTypeColumnNameAndNumber(thisHicCellTypeSpecific)
+    if thisHicCellTypeSpecific~="-1"
+    and thisHicCellTypeSpecific~=-1
+    and thisHicCellTypeSpecific~="GM12878"
+    and thisHicCellTypeSpecific~="HMEC"
+    and thisHicCellTypeSpecific~="HUVEC"
+    and thisHicCellTypeSpecific~="HeLa"
+    and thisHicCellTypeSpecific~="IMR90"
+    and thisHicCellTypeSpecific~="k562"
+    and thisHicCellTypeSpecific~="KBM7"
+    and thisHicCellTypeSpecific~="NHEK" then
+      
+      print("Error: the thisHicCellTypeSpecific = "..thisHicCellTypeSpecific.." is not one of the 8 cell type available in the Hi-C dataset (GM12878, HMEC, HUVEC, HeLa, IMR90, k562, KBM7, NHEK). The program will stop");
+      os.exit();  
+    end
+
+    local dnaseCellTypeToHighlightNumber = -1
+
+    if thisHicCellTypeSpecific=="GM12878" then dnaseCellTypeToHighlightNumber = GM12878_dnaseCellType end
+    if thisHicCellTypeSpecific=="HUVEC" then dnaseCellTypeToHighlightNumber = HUVEC_dnaseCellType end
+    if thisHicCellTypeSpecific=="IMR90" then dnaseCellTypeToHighlightNumber = IMR90_dnaseCellType end
+    if thisHicCellTypeSpecific=="k562" then dnaseCellTypeToHighlightNumber = k562_dnaseCellType end
+
+
+    local dnaseCellTypeToHighlightName = "";
+    if dnaseCellTypeToHighlightNumber>=1 and dnaseCellTypeToHighlightNumber<=CELL_TYPE_NUMBER then
+      
+      local columnNames = getColumnNamesOfTable("chromregionprofiles")
+      local dnaseExcludeColumnName = columnNames[dnaseExcludeColumn]
+      
+      dnaseCellTypeToHighlightName = columnNames[dnaseCellTypeToHighlightNumber]
+      print("RETRIEVING THE FEATURE-COLUMN "..dnaseCellTypeToHighlightName.." number "..dnaseCellTypeToHighlightNumber.." among "..CELL_TYPE_NUMBER);
+    elseif dnaseCellTypeToHighlightNumber==-1 or dnaseCellTypeToHighlightNumber=="-1" then
+      print("No cell type will be retrieved in the input DNase table");
+    else
+	print("Error: the dnaseCellTypeToHighlightNumber = "..dnaseCellTypeToHighlightNumber.." is not in the 1- "..CELL_TYPE_NUMBER.." interval. The program will stop");
+      os.exit();  
+    end
+    
+    return dnaseCellTypeToHighlightNumber, dnaseCellTypeToHighlightName;
+end
+
+
 --
 -- Function that does not apply the regularization only to the three 
 
@@ -64,8 +114,6 @@ globalMinFPplusFN_vector = {}
 -- - hidden_units = number of hidden units of the neural network
 -- - input_number = number of input units of the neural network
 -- The rest is the same of sgd.
---
---
 function optim.sgd_3cellTypesHighlight(opfunc, x, config, state, feature_index, hidden_units, input_number)
   
   -- io.write("feature_index = "..feature_index.."\thidden_units = "..hidden_units.."\tinput_number = "..input_number)
@@ -821,11 +869,16 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 			  config = {learningRate=LEARN_RATE}
 			  
 			end
-			-- optim.sgd(feval, params, config) 
+			-- optim.sgd(feval, params, config, state) 
 			local state = nil
-			-- optim.sgd_NEW(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, input_number)
 			
-			optim.sgd_3cellTypesHighlight(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, CELL_TYPE_NUMBER)
+			if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then
+			  optim.sgd_NEW(feval, params, config, state, trainingSetCellTypeColumnNumber, hiddenUnits, input_number)
+			else
+			  optim.sgd(feval, params, config, state) 
+			end
+			  
+			-- optim.sgd_3cellTypesHighlight(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, CELL_TYPE_NUMBER)
 			  
 		    else  -- former gradient minibatch update
 		      
@@ -1369,14 +1422,14 @@ require "nn";
  local val_tuple_limit = -1
  local val_balancedFalsePerc = -1
   
-    val_chrStart_locus = tonumber(arg[12]) 
-    val_chrEnd_locus = tonumber(arg[13]) 
-    val_tuple_limit = tonumber(arg[14]) 
-    val_balancedFalsePerc = tonumber(arg[15]) 
+ val_chrStart_locus = tonumber(arg[12]) 
+ val_chrEnd_locus = tonumber(arg[13]) 
+ val_tuple_limit = tonumber(arg[14]) 
+ val_balancedFalsePerc = tonumber(arg[15]) 
       
-    print("validation segment: "..chromSel.." from "..val_chrStart_locus.." to "..val_chrEnd_locus);
-    print("val_tuple_limit = "..val_tuple_limit);
-    print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
+ print("validation segment: "..chromSel.." from "..val_chrStart_locus.." to "..val_chrEnd_locus);
+ print("val_tuple_limit = "..val_tuple_limit);
+ print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
  
 
  local secondSpan_chrStart_locus = -1 
@@ -1425,52 +1478,10 @@ end
 
 local hicCellTypeSpecific = tostring(arg[21]);
 print("hicCellTypeSpecific = "..hicCellTypeSpecific);
-
-
-if hicCellTypeSpecific~="-1"
-and hicCellTypeSpecific~=-1
-and hicCellTypeSpecific~="GM12878"
-and hicCellTypeSpecific~="HMEC"
-and hicCellTypeSpecific~="HUVEC"
-and hicCellTypeSpecific~="HeLa"
-and hicCellTypeSpecific~="IMR90"
-and hicCellTypeSpecific~="k562"
-and hicCellTypeSpecific~="KBM7"
-and hicCellTypeSpecific~="NHEK" then
-  
-  print("Error: the hicCellTypeSpecific = "..hicCellTypeSpecific.." is not one of the 8 cell type available in the Hi-C dataset (GM12878, HMEC, HUVEC, HeLa, IMR90, k562, KBM7, NHEK). The program will stop");
-  os.exit();  
-end
-
-dnaseCellTypeToHighlightNumber = tonumber(arg[22]); -- TO BE REMOVED
-
--- Number of the cell type in the DNase cell type list
-GM12878_dnaseCellType = 26
-HUVEC_dnaseCellType = 55
-IMR90_dnaseCellType = 57
-k562_dnaseCellType = 61
-
-if hicCellTypeSpecific~="GM12878" then dnaseCellTypeToHighlightNumber = GM12878_dnaseCellType end
-if hicCellTypeSpecific~="HUVEC" then dnaseCellTypeToHighlightNumber = HUVEC_dnaseCellType end
-if hicCellTypeSpecific~="IMR90" then dnaseCellTypeToHighlightNumber = IMR90_dnaseCellType end
-if hicCellTypeSpecific~="k562" then dnaseCellTypeToHighlightNumber = k562_dnaseCellType end
-
+original_dnaseCellTypeToHighlightNumber = tonumber(arg[22]); -- TO BE REMOVED
 
 dnaseCellTypeToHighlightName = "";
-if dnaseCellTypeToHighlightNumber>=1 and dnaseCellTypeToHighlightNumber<=CELL_TYPE_NUMBER then
-  
-  columnNames = getColumnNamesOfTable("chromregionprofiles")
-  dnaseExcludeColumnName = columnNames[dnaseExcludeColumn]
-  
-  dnaseCellTypeToHighlightName = columnNames[dnaseCellTypeToHighlightNumber]
-  print("HIGHLIGHTING THE FEATURE-COLUMN "..dnaseCellTypeToHighlightName.." number "..dnaseCellTypeToHighlightNumber.." among "..CELL_TYPE_NUMBER);
-elseif dnaseCellTypeToHighlightNumber==-1 or dnaseCellTypeToHighlightNumber=="-1" then
-  print("No cell type will be highlighted in the input DNase table");
-else
-    print("Error: the dnaseCellTypeToHighlightNumber = "..dnaseCellTypeToHighlightNumber.." is not in the 1- "..CELL_TYPE_NUMBER.." interval. The program will stop");
-  os.exit();  
-end
-
+dnaseCellTypeToHighlightNumber, dnaseCellTypeToHighlightName = retrieveCellTypeColumnNameAndNumber(hicCellTypeSpecific)
 
 if tonumber(dnaseCellTypeToHighlightNumber)~=-1 then
   NO_INTERSECTION_BETWEEN_SETS = false
@@ -1486,6 +1497,24 @@ if tostring(PROFI_FLAG) == tostring(true) then
 end
 
 
+local trainingSetCellTypeName = tostring(arg[24]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+if trainingSetCellTypeName=="-1" or trainingSetCellTypeName==-1 then
+  print("[input] All the cell types will be considered in the training set (except the highlighted cell type, if present)");
+else
+  print("[input] The training set will be made only of Hi-C interactions of "..trainingSetCellTypeName.." cell type");
+end
+
+trainingSetCellTypeColumnName = "";
+trainingSetCellTypeColumnNumber = -1;
+
+if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then -- TRAINING SET LIMITED TO ONE CELL TYPE
+  trainingSetCellTypeColumnNumber, trainingSetCellTypeColumnName = retrieveCellTypeColumnNameAndNumber(trainingSetCellTypeName)
+end
+
+-- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
+-- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
+-- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
+-- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
 -- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
  
 if execution ~=  "OPTIMIZATION-TRAINING-HELD-OUT" 
@@ -1535,6 +1564,12 @@ if READ_DATA_FROM_DB == true then
 
   local uniformDistribution = true;
   local thisHicCellTypeToConsiderTraining = -1
+  
+  -- IS THE TRAINING SET LIMITED TO ONE CELL TYPE?
+  if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then 
+    thisHicCellTypeToConsiderTraining = trainingSetCellTypeColumnName;
+    print("[DB] The training set will contain only interactions of the "..thisHicCellTypeToConsiderTraining.." cell type")
+  end
 
   -- READIN' THE TRAINING SET
   local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeSpecific, thisHicCellTypeToConsiderTraining)
@@ -1554,7 +1589,9 @@ if READ_DATA_FROM_DB == true then
   dataset_secondChromRegion = unbal_data_read_output[4];
   targetVector = unbal_data_read_output[5];
 
-  end
+  end --(endif execution ~= "JUST-TESTING")
+  
+
   
   -- READIN' THE VALIDATION SET
   if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" or execution == "JUST-TESTING"  then
@@ -1566,6 +1603,9 @@ if READ_DATA_FROM_DB == true then
       -- We don't want to exclude the 
       local thisHicCellTypeToExclude = -1
       
+      if hicCellTypeSpecific~="-1" then
+	print("The test set will contain only interactions of the "..hicCellTypeSpecific.." cell type");
+      end
       
       local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, thisHicCellTypeToExclude, hicCellTypeSpecific);
       
@@ -1575,6 +1615,8 @@ if READ_DATA_FROM_DB == true then
       val_targetVector = val_dataset_output[5];  
       
       dnaseDataTable_only_IDs_val = val_dataset_output[8];
+          
+
     else
       VAL_PERC = 20
       
@@ -2016,7 +2058,10 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
       local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
       
       local currentMCC = applicationOutput[3]
+      local currentAccuracy = applicationOutput[1]
       io.write("currentMCC = "..round(currentMCC,2));
+      io.write(" currentAccuracy = "..round(currentAccuracy,3));
+
       io.write(" hiddenUnits = "..hiddenUnits);
       io.write(" hiddenLayers = "..hiddenLayers.."\n");
       io.flush();
