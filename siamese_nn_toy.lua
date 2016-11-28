@@ -31,7 +31,7 @@ SUFFICIENT_MCC = 0.9;
 XAVIER_INITIALIZATION = false;
 MOMENTUM_FLAG = true;
 MOMENTUM_ALPHA = 0.5;
-
+PRINT_NOT_REG_CELL_TYPE_ONCE = false;
 
 ITERATIONS_CONST = 1000; -- ******** 1000 **********
 LEARNING_RATE_CONST = 0.001; -- ******** 0.001 **********
@@ -41,7 +41,9 @@ CELL_TYPE_NUMBER = 82;
 READ_DATA_FROM_DB = true; -- ********* true *********
 NO_INTERSECTION_BETWEEN_SETS = true; -- ******** true **********
 
+PRINT_NOT_REG_INDICES_ONCE = true
 
+PRINT_NOT_REG_CELL_TYPE_ONCE = true
 
 require 'optim'
 require '../../torch/NEW_CosineDistance.lua'
@@ -100,6 +102,122 @@ function retrieveCellTypeColumnNameAndNumber(thisHicCellTypeSpecific)
     return dnaseCellTypeToHighlightNumber, dnaseCellTypeToHighlightName;
 end
 
+--
+-- Function that does not apply the regularization only to the three 
+
+-- This function does NOT apply the regularization to the feature indEX of the  cell type INDICATED
+-- 
+-- new version of sgd_NEW
+--
+-- 
+-- 
+-- - hidden_units = number of hidden units of the neural network
+-- - input_number = number of input units of the neural network
+-- The rest is the same of sgd.
+function optim.sgd_1cellTypeHighlight(opfunc, x, config, state, feature_index, hidden_units, input_number)
+  
+  -- io.write("feature_index = "..feature_index.."\thidden_units = "..hidden_units.."\tinput_number = "..input_number)
+  io.flush()
+  
+   -- (0) get/update state
+   local config = config or {}
+   local state = state or config
+   local lr = config.learningRate or 1e-3
+   local lrd = config.learningRateDecay or 0
+   local wd = config.weightDecay or 0
+   local mom = config.momentum or 0
+   local damp = config.dampening or mom
+   local nesterov = config.nesterov or false
+   local lrs = config.learningRates
+   local wds = config.weightDecays
+   state.evalCounter = state.evalCounter or 0
+   local nevals = state.evalCounter
+   assert(not nesterov or (mom > 0 and damp == 0), "Nesterov momentum requires a momentum and zero dampening")
+
+   -- (1) evaluate f(x) and df/dx
+   local fx,dfdx = opfunc(x)
+   
+   -- print("hidden_units = "..hidden_units);
+   -- print("input_number = "..input_number);
+   
+   -- new part
+   local original_dfdx = dfdx:clone()
+
+   -- (2) weight decay with single or individual parameters
+   if wd ~= 0 then
+     
+	  dfdx:add(wd, x)
+	  
+	    local idp = 5
+	    if PRINT_NOT_REG_INDICES_ONCE then  io.write("not-regularized indices = "); end
+	    for i=0,hidden_units-1 do
+	      -- io.write("(i="..i..") ")
+	      --io.write("index = "..feature_index.." +("..i.."*"..input_number..")");
+	      io.flush();
+	      local index = feature_index+(i*input_number) 
+	      
+		
+	      dfdx[index] = original_dfdx[index]
+	      if PRINT_NOT_REG_INDICES_ONCE then 
+	      io.write("[index="..index.."]\t")
+		io.flush()
+	      end
+	    end
+	    
+	    if PRINT_NOT_REG_INDICES_ONCE then 
+	      
+	      io.write("\n")
+	      io.flush()
+	    end
+	    
+
+
+    elseif wds then
+      if not state.decayParameters then
+         state.decayParameters = torch.Tensor():typeAs(x):resizeAs(dfdx)
+      end
+      state.decayParameters:copy(wds):cmul(x)
+      dfdx:add(state.decayParameters)
+   end
+   
+   PRINT_NOT_REG_INDICES_ONCE = false
+   -- (3) apply momentum
+   if mom ~= 0 then
+      if not state.dfdx then
+         state.dfdx = torch.Tensor():typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
+      else
+         state.dfdx:mul(mom):add(1-damp, dfdx)
+      end
+      if nesterov then
+         dfdx:add(mom, state.dfdx)
+      else
+         dfdx = state.dfdx
+      end
+   end
+
+   -- (4) learning rate decay (annealing)
+   local clr = lr / (1 + nevals*lrd)
+   
+   -- (5) parameter update with single or individual learning rates
+   if lrs then
+      if not state.deltaParameters then
+         state.deltaParameters = torch.Tensor():typeAs(x):resizeAs(dfdx)
+      end
+      state.deltaParameters:copy(lrs):cmul(dfdx)
+      x:add(-clr, state.deltaParameters)
+   else
+      x:add(-clr, dfdx)
+   end
+
+   -- (6) update evaluation counter
+   state.evalCounter = state.evalCounter + 1
+
+   
+   -- return x*, f(x) before optimization
+   return x,{fx}
+end
+   
+
 
 --
 -- Function that does not apply the regularization only to the three 
@@ -149,14 +267,14 @@ function optim.sgd_3cellTypesHighlight(opfunc, x, config, state, feature_index, 
 	  dfdx:add(wd, x)
 	  
 	    local idp = 5
-	    if PRINT_ONCE then  io.write("not-regularized indices = "); end
+	    if PRINT_NOT_REG_INDICES_ONCE then  io.write("not-regularized indices = "); end
 	    for i=0,hidden_units-1 do
 	      -- io.write("(i="..i..") ")
 	      local index_GM12878 = GM12878_dnaseCellType+(i*input_number) 
 	      local index_HUVEC = HUVEC_dnaseCellType+(i*input_number)
 	      local index_IMR90 = IMR90_dnaseCellType+(i*input_number)
 	      local index_k562 = k562_dnaseCellType+(i*input_number)
-	      if PRINT_ONCE then 
+	      if PRINT_NOT_REG_INDICES_ONCE then 
 		
 		if feature_index~=GM12878_dnaseCellType then io.write("["..index_GM12878.."]\t") end	      
 		if feature_index~=HUVEC_dnaseCellType then io.write("["..index_HUVEC.."]\t") end	      
@@ -175,12 +293,12 @@ function optim.sgd_3cellTypesHighlight(opfunc, x, config, state, feature_index, 
 	      
 	    end
 	    
-	    if PRINT_ONCE then 
+	    if PRINT_NOT_REG_INDICES_ONCE then 
 	      io.write("\n")
 	      io.flush()
 	    end
 	    
-	    PRINT_ONCE = false
+	    PRINT_NOT_REG_INDICES_ONCE = false
 
     elseif wds then
       if not state.decayParameters then
@@ -873,7 +991,13 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
 			local state = nil
 			
 			if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then
-			  optim.sgd_NEW(feval, params, config, state, trainingSetCellTypeColumnNumber, hiddenUnits, input_number)
+			  
+			  if PRINT_NOT_REG_INDICES_ONCE==true then
+			    print("We will now avoid the regularization on the #"..trainingSetCellTypeColumnNumber.." cell type, corresponding to the "..trainingSetCellTypeName.." cell type\n");
+			    io.flush()
+			  end
+			  
+			  optim.sgd_1cellTypeHighlight(feval, params, config, state, trainingSetCellTypeColumnNumber, hiddenUnits, CELL_TYPE_NUMBER)
 			else
 			  optim.sgd(feval, params, config, state) 
 			end
@@ -1497,7 +1621,7 @@ if tostring(PROFI_FLAG) == tostring(true) then
 end
 
 
-local trainingSetCellTypeName = tostring(arg[24]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+trainingSetCellTypeName = tostring(arg[24]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
 if trainingSetCellTypeName=="-1" or trainingSetCellTypeName==-1 then
   print("[input] All the cell types will be considered in the training set (except the highlighted cell type, if present)");
 else
