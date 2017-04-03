@@ -19,36 +19,38 @@ profi_flag="false"
 ## k562 -> 61
 ## GM12878 -> 26 (GM12865)
 
-# hicCellTypeNameToHighlight="IMR90"
-# hicCellTypeNumberToHighlight=57
-
 #trainingSetCellTypeName="-1"
-trainingSetCellTypeName="IMR90"
+trainingSetCellTypeName="HUVEC"
 
 #hicCellTypeNameToHighlight="IMR90"
 #hicCellTypeNumberToHighlight=57
 
-#hicCellTypeNameToHighlight="GM12878"
-#hicCellTypeNumberToHighlight=26
+hicCellTypeNameToHighlight="GM12878"
+hicCellTypeNumberToHighlight=26
 
-hicCellTypeNameToHighlight="k562"
-hicCellTypeNumberToHighlight=61
+# hicCellTypeNameToHighlight="k562"
+# hicCellTypeNumberToHighlight=61
+
+# hicCellTypeNameToHighlight="IMR90"
+# hicCellTypeNumberToHighlight=57
 
 #hicCellTypeNameToHighlight="HUVEC"
 #hicCellTypeNumberToHighlight=55
+
+today=`date +%Y-%m-%d`
 
 # OPTIMIZATION-TRAINING-HELD-OUT-DISTAL
 execution="SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"
 
 #tupleLimit=20000
 
-tupleLimit=60000
+tupleLimit=30000
 proportion=1000
 mem_size=$((tupleLimit / proportion))
 #mem_size=48
 
 
-folder="../results/2016-02-28_optim_allChrom_regExc_train_on_"${trainingSetCellTypeName}"_test_on_"${hicCellTypeNameToHighlight}"_"${tupleLimit}"elems"/
+folder="../results/"$today"_optim_allChrom_regExc_train_on_"${trainingSetCellTypeName}"_test_on_"${hicCellTypeNameToHighlight}"_"${tupleLimit}"elems"/
 mkdir -p $folder
 
 i=1
@@ -68,7 +70,7 @@ do
   
   modelFile="./models/${chrNum}_"${hicCellTypeNameToHighlight}"_whole_chromosome__trained_model_yesMinibatch_${tupleLimit}elems_bal_${random_number}rand"
 
-  qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${hicCellTypeNameToHighlight}_${chrNum}_pred${tupleLimit} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameToHighlight $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName > $outputFile 2> $outputFile
+  qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${trainingSetCellTypeName}_${hicCellTypeNameToHighlight}_${chrNum}_pred${tupleLimit} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameToHighlight $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName > $outputFile 2> $outputFile
 
 
 done
@@ -84,4 +86,4 @@ outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}-yesMiniba
   
 modelFile="./models/${chrNum}_"${hicCellTypeNameToHighlight}"_whole_chromosome__trained_model_yesMinibatch_${tupleLimit}elems_bal_${random_number}rand"
 
-qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${hicCellTypeNameToHighlight}_${chrNum}_pred${tupleLimit} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameToHighlight $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName > $outputFile 2> $outputFile
+qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${trainingSetCellTypeName}_${hicCellTypeNameToHighlight}_${chrNum}_pred${tupleLimit} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameToHighlight $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName > $outputFile 2> $outputFile

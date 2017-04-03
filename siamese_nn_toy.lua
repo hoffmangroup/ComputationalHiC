@@ -45,8 +45,8 @@ PRINT_NOT_REG_CELL_TYPE_ONCE = true
 SCORE_UNDEF = -2
 
 require 'optim'
-require '../../torch/NEW_CosineDistance.lua'
-
+-- require '../../torch/NEW_CosineDistance.lua'
+require './lib/NEW_CosineDistance.lua'
 
 local globalArrayFPindices = {}
 local globalArrayFPvalues = {}
@@ -633,7 +633,8 @@ end
   local recall_vect = {}
 
   
-  ROC = require '../../torch/lib/metrics/roc_thresholds.lua';
+  -- ROC = require '../../torch/lib/metrics/roc_thresholds.lua'
+  ROC = require './lib/roc_thresholds.lua'
   local newVect = fromZeroOneToMinusOnePlusOne(truthVector)
   local roc_points = torch.Tensor(#completePredValueVector, 2)
   local precision_recall_points = torch.Tensor(#completePredValueVector, 2)
@@ -676,9 +677,8 @@ end
   local area_roc = round(areaNew(tp_rate,fp_rate)*100,2);
   print("metrics area_roc = "..area_roc.."%");	
 
--- ######## Line too long (86 chars) ######## :
 	if area_roc < 0 then io.stderr:write('ERROR: AUC < 0%, problem ongoing'); return; end
--- ######## Line too long (91 chars) ######## :
+
 	if area_roc > 100 then io.stderr:write('ERROR: AUC > 100%, problem ongoing'); return; end	
   
 -- ######## Line too long (105 chars) ######## :
@@ -688,8 +688,9 @@ end
   -- printVector(precision_vect, "precision_vect");
   -- printVector(recall_vect, "recall_vect");
   
-  require '../../torch/lib/sort_two_arrays_from_first.lua';
--- ######## Line too long (115 chars) ######## :
+  -- require '../../torch/lib/sort_two_arrays_from_first.lua';
+  require './lib/sort_two_arrays_from_first.lua';
+
   sortedRecallVett, sortedPrecisionVett = sort_two_arrays_from_first(recall_vect, precision_vect,  #precision_vect)
   
   -- printVector(sortedPrecisionVett, "sortedPrecisionVett");
@@ -800,8 +801,8 @@ function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_la
   
   -- XAVIER weight initialization
   if XAVIER_INITIALIZATION ==true then 
--- ######## Line too long (114 chars) ######## :
-  perceptronUpper = require("../../torch/lib/torch-toolbox/weight-init.lua")(perceptronUpper,  'xavier') -- XAVIER
+   -- perceptronUpper = require("../../torch/lib/torch-toolbox/weight-init.lua")(perceptronUpper,  'xavier') -- XAVIER
+    perceptronUpper = require("./lib/weight-init.lua")(perceptronUpper,  'xavier') -- XAVIER
   end
   
   -- local perceptronLower = perceptronUpper:clone('weight', 'gradWeight') 
@@ -822,7 +823,8 @@ function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_la
   
   -- XAVIER weight initialization
   if XAVIER_INITIALIZATION ==true then 
-    perceptronLower = require("../../torch/lib/torch-toolbox/weight-init.lua")(perceptronLower,  'xavier') -- XAVIER
+    -- perceptronLower = require("../../torch/lib/torch-toolbox/weight-init.lua")(perceptronLower,  'xavier') -- XAVIER
+    perceptronLower = require("./lib/weight-init.lua")(perceptronLower,  'xavier') -- XAVIER
   end
 
   
@@ -1598,8 +1600,11 @@ require "nn";
 -- # # # DATA READING # # #
 
 
-require "../../_project/bin/database_management.lua"
-require "../../_project/bin/utils.lua"
+-- require "../../_project/bin/database_management.lua"
+-- require "../../_project/bin/utils.lua"
+require "./lib/database_management.lua"
+require "./lib/utils.lua"
+
 
 io.write(">>> th siamese_nn_toy.lua ");
 MAX_PARAMS = #arg
