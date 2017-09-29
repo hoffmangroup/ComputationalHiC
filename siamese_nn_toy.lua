@@ -43,6 +43,7 @@ NO_INTERSECTION_BETWEEN_SETS = true; -- ******** true **********
 PRINT_NOT_REG_INDICES_ONCE = true
 PRINT_NOT_REG_CELL_TYPE_ONCE = true
 SCORE_UNDEF = -2
+HIGHLIGHT_NEURON_WEIGHT_1ST_CELL_TYPE = false
 
 require 'optim'
 -- require '../../torch/NEW_CosineDistance.lua'
@@ -830,11 +831,11 @@ function architecture_creator(input_number, hiddenUnits, hiddenLayers, output_la
   
   --^^^ Highlight a cell type by setting all its starting weights to 1
   --^^^
-  if dnaseCellTypeToHighlightNumber~=-1 and dnaseCellTypeToHighlightNumber~="-1" then
+  if HIGHLIGHT_NEURON_WEIGHT_1ST_CELL_TYPE == true and dnaseCellTypeToHighlightNumber1~=-1 and dnaseCellTypeToHighlightNumber1~="-1" then
     print("We now will highlight the cell type #"..dnaseCellTypeToHighlightNumber.." "..dnaseCellTypeToHighlightName.." by initializing to 1.0 all its weights");
     
-    perceptronUpper:get(1).weight[dnaseCellTypeToHighlightNumber]:fill(1)
-    perceptronLower:get(1).weight[dnaseCellTypeToHighlightNumber]:fill(1)
+    perceptronUpper:get(1).weight[dnaseCellTypeToHighlightNumber1]:fill(1)
+    perceptronLower:get(1).weight[dnaseCellTypeToHighlightNumber1]:fill(1)
   end
   
   -- we make a parallel table that takes a pair of examples as input. they both go through the same (cloned) perceptron
@@ -1040,28 +1041,24 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
       -- optim.sgd(feval, params, config, state) 
       local state = nil
       
-      if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then
+      -- if hicCellTypeTrainingSet1~="-1" and hicCellTypeTrainingSet1~=-1 then
+      if HIGHLIGHT_NEURON_WEIGHT_1ST_CELL_TYPE==true then
       
-      if PRINT_NOT_REG_INDICES_ONCE==true then
--- ######## Line too long (173 chars) ######## :
-       print("We will now avoid the regularization on the #"..trainingSetCellTypeColumnNumber.." cell type, corresponding to the "..trainingSetCellTypeName.." cell type\n");
-       io.flush()
-      end
+	if PRINT_NOT_REG_INDICES_ONCE==true then
+
+	print("We will now avoid the regularization on the #"..trainingSetCellTypeColumnNumber1.." cell type, corresponding to the "..hicCellTypeTrainingSet1.." cell type\n");
+	io.flush()
+	end
       
--- ######## Line too long (128 chars) ######## :
-      optim.sgd_1cellTypeHighlight(feval, params, config, state, trainingSetCellTypeColumnNumber, hiddenUnits, CELL_TYPE_NUMBER)
+	optim.sgd_1cellTypeHighlight(feval, params, config, state, trainingSetCellTypeColumnNumber1, hiddenUnits, CELL_TYPE_NUMBER)
       else
-      optim.sgd(feval, params, config, state) 
+	optim.sgd(feval, params, config, state) 
       end
       
--- ######## Line too long (131 chars) ######## :
       -- optim.sgd_3cellTypesHighlight(feval, params, config, state, dnaseCellTypeToHighlightNumber, hiddenUnits, CELL_TYPE_NUMBER)
       
      else  -- former gradient minibatch update
       
-      
-      
--- ######## Line too long (154 chars) ######## :
       local output_gradientUpdateMinibatch = gradientUpdateMinibatch(generalPerceptron, current_minibatch_train, current_target_train, learnRate, ite, c);
       
       generalPerceptron = output_gradientUpdateMinibatch[1];
@@ -1678,10 +1675,10 @@ local secondSpan_chrEnd_locus = -1
 -- ######## Line too long (268 chars) ######## :
 if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then
 
-secondSpan_chrStart_locus = tonumber(arg[16]) 
-secondSpan_chrEnd_locus = tonumber(arg[17]) 
-print("secondSpan_chrStart_locus = "..secondSpan_chrStart_locus);
-print("secondSpan_chrEnd_locus = "..secondSpan_chrEnd_locus);
+  secondSpan_chrStart_locus = tonumber(arg[16]) 
+  secondSpan_chrEnd_locus = tonumber(arg[17]) 
+  print("secondSpan_chrStart_locus = "..secondSpan_chrStart_locus);
+  print("secondSpan_chrEnd_locus = "..secondSpan_chrEnd_locus);
 end
 
 MINIBATCH = tostring(arg[18]) 
@@ -1708,30 +1705,42 @@ local columnNames = {}
 if dnaseExcludeColumn>=1 and dnaseExcludeColumn<=CELL_TYPE_NUMBER then
 columnNames = getColumnNamesOfTable("chromregionprofiles")
 dnaseExcludeColumnName = columnNames[dnaseExcludeColumn]
--- ######## Line too long (124 chars) ######## :
+
 print("EXCLUDING THE FEATURE-COLUMN "..dnaseExcludeColumnName.." number "..dnaseExcludeColumn.." among "..CELL_TYPE_NUMBER);
 elseif dnaseExcludeColumn==-1 or dnaseExcludeColumn=="-1" then
 print("No cell type will be excluded from the input DNase table");
 else
--- ######## Line too long (143 chars) ######## :
+
  print("Error: the dnaseExcludeColumnName = "..dnaseExcludeColumn.." is not in the 1- "..CELL_TYPE_NUMBER.." interval. The program will stop");
 os.exit();  
 end
 
-local hicCellTypeSpecific = tostring(arg[21]);
-print("hicCellTypeSpecific = "..hicCellTypeSpecific);
-original_dnaseCellTypeToHighlightNumber = tonumber(arg[22]); -- TO BE REMOVED
+local hicCellTypeValidSet1 = tostring(arg[21]);
+print("hicCellTypeValidSet1 = "..hicCellTypeValidSet1);
+local hicCellTypeValidSet2 = tostring(arg[22]);
+print("hicCellTypeValidSet2 = "..hicCellTypeValidSet2);
+local hicCellTypeValidSet3 = tostring(arg[23]);
+print("hicCellTypeValidSet3 = "..hicCellTypeValidSet3);
+local hicCellTypeValidSet4 = tostring(arg[24]);
+print("hicCellTypeValidSet4 = "..hicCellTypeValidSet4);
 
-dnaseCellTypeToHighlightName = "";
--- ######## Line too long (119 chars) ######## :
-dnaseCellTypeToHighlightNumber, dnaseCellTypeToHighlightName = retrieveCellTypeColumnNameAndNumber(hicCellTypeSpecific)
 
-if tonumber(dnaseCellTypeToHighlightNumber)~=-1 then
-NO_INTERSECTION_BETWEEN_SETS = false
+dnaseCellTypeToHighlightName1 = "";
+dnaseCellTypeToHighlightNumber1, dnaseCellTypeToHighlightName1 = retrieveCellTypeColumnNameAndNumber(hicCellTypeValidSet1)
+dnaseCellTypeToHighlightName2 = "";
+dnaseCellTypeToHighlightNumber2, dnaseCellTypeToHighlightName2 = retrieveCellTypeColumnNameAndNumber(hicCellTypeValidSet2)
+dnaseCellTypeToHighlightName3 = "";
+dnaseCellTypeToHighlightNumber3, dnaseCellTypeToHighlightName3 = retrieveCellTypeColumnNameAndNumber(hicCellTypeValidSet3)
+dnaseCellTypeToHighlightName4 = "";
+dnaseCellTypeToHighlightNumber4, dnaseCellTypeToHighlightName4 = retrieveCellTypeColumnNameAndNumber(hicCellTypeValidSet4)
+
+
+if tonumber(dnaseCellTypeToHighlightNumber1)~=-1 then
+  NO_INTERSECTION_BETWEEN_SETS = false
 end
 
 PROFI_FLAG = false
-PROFI_FLAG = tostring(arg[23])
+PROFI_FLAG = tostring(arg[25])
 if tostring(PROFI_FLAG) == tostring(true) then
 ProFi = require "../temp/ProFi"
 print("ProFi = require ../temp/ProFi")
@@ -1740,35 +1749,48 @@ print("ProFi:start()")
 end
 
 
--- ######## Line too long (124 chars) ######## :
-trainingSetCellTypeName = tostring(arg[24]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
-if trainingSetCellTypeName=="-1" or trainingSetCellTypeName==-1 then
--- ######## Line too long (122 chars) ######## :
-print("[input] All the cell types will be considered in the training set (except the highlighted cell type, if present)");
-else
--- ######## Line too long (116 chars) ######## :
-print("[input] The training set will be made only of Hi-C interactions of "..trainingSetCellTypeName.." cell type");
+hicCellTypeTrainingSet1 = tostring(arg[26]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+print("hicCellTypeTrainingSet1 = ".. hicCellTypeTrainingSet1)
+hicCellTypeTrainingSet2 = tostring(arg[27]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+print("hicCellTypeTrainingSet2 = ".. hicCellTypeTrainingSet2)
+hicCellTypeTrainingSet3 = tostring(arg[28]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+print("hicCellTypeTrainingSet3 = ".. hicCellTypeTrainingSet3)
+hicCellTypeTrainingSet4 = tostring(arg[29]); -- 	THIS IS ALSO A FLAG TO UNDERSTAND IF THE TRAINING SET IS CELL-TYPE-SPECIFIC
+print("hicCellTypeTrainingSet4 = ".. hicCellTypeTrainingSet4)
+
+trainingSetCellTypeColumnName1 = "";
+trainingSetCellTypeColumnNumber1 = -1;
+if hicCellTypeTrainingSet1~="-1" and hicCellTypeTrainingSet1~=-1 then
+  print("[input] The training set will be made of Hi-C interactions of "..hicCellTypeTrainingSet1.." cell type");
+  trainingSetCellTypeColumnNumber1, trainingSetCellTypeColumnName1 = retrieveCellTypeColumnNameAndNumber(hicCellTypeTrainingSet1)
 end
 
-trainingSetCellTypeColumnName = "";
-trainingSetCellTypeColumnNumber = -1;
-
--- ######## Line too long (110 chars) ######## :
-if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then -- TRAINING SET LIMITED TO ONE CELL TYPE
--- ######## Line too long (125 chars) ######## :
-trainingSetCellTypeColumnNumber, trainingSetCellTypeColumnName = retrieveCellTypeColumnNameAndNumber(trainingSetCellTypeName)
+trainingSetCellTypeColumnName2 = "";
+trainingSetCellTypeColumnNumber2 = -1;
+if hicCellTypeTrainingSet2~="-1" and hicCellTypeTrainingSet2~=-1 then
+  print("[input] The training set will be made of Hi-C interactions of "..hicCellTypeTrainingSet2.." cell type");
+  trainingSetCellTypeColumnNumber2, trainingSetCellTypeColumnName2 = retrieveCellTypeColumnNameAndNumber(hicCellTypeTrainingSet2)
 end
 
--- ######## Line too long (90 chars) ######## :
--- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
--- ######## Line too long (90 chars) ######## :
--- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
--- ######## Line too long (90 chars) ######## :
--- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
--- ######## Line too long (90 chars) ######## :
--- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
--- ######## Line too long (90 chars) ######## :
--- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % -- % --
+
+trainingSetCellTypeColumnName3 = "";
+trainingSetCellTypeColumnNumber3 = -1;
+if hicCellTypeTrainingSet3~="-1" and hicCellTypeTrainingSet3~=-1 then
+  print("[input] The training set will be made of Hi-C interactions of "..hicCellTypeTrainingSet3.." cell type");
+  trainingSetCellTypeColumnNumber3, trainingSetCellTypeColumnName3 = retrieveCellTypeColumnNameAndNumber(hicCellTypeTrainingSet3)
+end
+
+
+trainingSetCellTypeColumnName4 = "";
+trainingSetCellTypeColumnNumber4 = -1;
+if hicCellTypeTrainingSet4~="-1" and hicCellTypeTrainingSet4~=-1 then
+  print("[input] The training set will be made of Hi-C interactions of "..hicCellTypeTrainingSet4.." cell type");
+  trainingSetCellTypeColumnNumber4, trainingSetCellTypeColumnName4 = retrieveCellTypeColumnNameAndNumber(hicCellTypeTrainingSet4)
+end
+
+
+
+-- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % 
 
 if execution ~=  "OPTIMIZATION-TRAINING-HELD-OUT" 
 and execution ~= "OPTIMIZATION-TRAINING-CROSS-VALIDATION" 
@@ -1810,32 +1832,24 @@ if execution ~= "JUST-TESTING" then
 
 experimentDetails = "==> Experiment details:\n "..regionLabel.."\n";
 experimentDetails = experimentDetails .." tuple_limit = "..tuple_limit.."\n";
--- ######## Line too long (142 chars) ######## :
 experimentDetails = experimentDetails .." percentage of (-1) negative elements in the training set and test set = "..balancedFalsePerc.."%\n";
--- ######## Line too long (156 chars) ######## :
 experimentDetails = experimentDetails .." percentage of (+1) positive elements in the training set and test set = "..tonumber(100-balancedFalsePerc).."%\n";
--- ######## Line too long (120 chars) ######## :
 experimentDetails = experimentDetails .." percentage of elements for the training set = "..TRAINING_SAMPLES_PERC.."%\n";
--- ######## Line too long (130 chars) ######## :
 experimentDetails = experimentDetails .." percentage of elements for the test set = "..tonumber(100-TRAINING_SAMPLES_PERC).."%\n";
 
 local uniformDistribution = true;
-local thisHicCellTypeToConsiderTraining = -1
-
--- IS THE TRAINING SET LIMITED TO ONE CELL TYPE?
-if trainingSetCellTypeName~="-1" and trainingSetCellTypeName~=-1 then 
- thisHicCellTypeToConsiderTraining = trainingSetCellTypeColumnName;
--- ######## Line too long (119 chars) ######## :
- print("[DB] The training set will contain only interactions of the "..thisHicCellTypeToConsiderTraining.." cell type")
-end
 
 -- READIN' THE TRAINING SET
--- ######## Line too long (310 chars) ######## :
-local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeSpecific, thisHicCellTypeToConsiderTraining)
+
+-- previous (one cell type)
+-- local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeValidSet, hicCellTypeTrainingSet)
+
+local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeValidSet1, hicCellTypeValidSet2, hicCellTypeValidSet3, hicCellTypeValidSet4, hicCellTypeTrainingSet1, hicCellTypeTrainingSet2, hicCellTypeTrainingSet3, hicCellTypeTrainingSet4)
+
+
 
 local balancedDatasetSize = unbal_data_read_output[1];    
 -- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
--- ######## Line too long (88 chars) ######## :
 dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
 
 dnaseDataTable_only_IDs_training = unbal_data_read_output[8];
@@ -1855,23 +1869,33 @@ end --(endif execution ~= "JUST-TESTING")
 
 
 -- READIN' THE VALIDATION SET
--- ######## Line too long (343 chars) ######## :
 if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL" or execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "SINGLE-MODEL-TRAINING-CROSS-VALIDATION" or execution == "JUST-TESTING"  then
  
  if INDEPENDENT_VALIDATION_DATASET_READING == true then
   
   local val_uniformDistribution = true
   
-  -- We don't want to exclude the 
-  local thisHicCellTypeToExclude = -1
   
-  if hicCellTypeSpecific~="-1" then
--- ######## Line too long (98 chars) ######## :
-  print("The test set will contain only interactions of the "..hicCellTypeSpecific.." cell type");
+  if hicCellTypeValidSet1~="-1" and hicCellTypeValidSet1~=-1 then
+    print("The validation set will contain interactions of the "..hicCellTypeValidSet1.." cell type");
+  end
+  if hicCellTypeValidSet2~="-1" and hicCellTypeValidSet2~=-1 then
+    print("The validation set will contain interactions of the "..hicCellTypeValidSet2.." cell type");
+  end
+  if hicCellTypeValidSet3~="-1" and hicCellTypeValidSet3~=-1 then
+    print("The validation set will contain interactions of the "..hicCellTypeValidSet3.." cell type");
+  end
+  if hicCellTypeValidSet4~="-1" and hicCellTypeValidSet4~=-1 then
+    print("The validation set will contain interactions of the "..hicCellTypeValidSet4.." cell type");
   end
   
--- ######## Line too long (320 chars) ######## :
-  local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, thisHicCellTypeToExclude, hicCellTypeSpecific);
+  -- In the training set, we read interactions of the hicCellTypeTrainingSet cell type and avoided hicCellTypeValidSet cell types
+  -- Now in the test set, we do the opposite
+ 
+  -- previous (one cell type):
+  -- local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, hicCellTypeTrainingSet, hicCellTypeValidSet)
+  
+  local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, hicCellTypeTrainingSet1, hicCellTypeTrainingSet2, hicCellTypeTrainingSet3, hicCellTypeTrainingSet4, hicCellTypeValidSet1, hicCellTypeValidSet2, hicCellTypeValidSet3, hicCellTypeValidSet4)
   
   val_dnaseDataTable = val_dataset_output[2]; 
   val_dataset_firstChromRegion = val_dataset_output[3];
@@ -1892,34 +1916,25 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZ
   
   
   -- We arrange the validation set
--- ######## Line too long (101 chars) ######## :
   val_dnaseDataTable = subtable(dnaseDataTable, (#dnaseDataTable-val_tuple_limit+1), #dnaseDataTable)
   
--- ######## Line too long (141 chars) ######## :
   val_dataset_firstChromRegion = subtable(dataset_firstChromRegion, (#dataset_firstChromRegion-val_tuple_limit+1), #dataset_firstChromRegion)
   
--- ######## Line too long (145 chars) ######## :
   val_dataset_secondChromRegion = subtable(dataset_secondChromRegion, (#dataset_secondChromRegion-val_tuple_limit+1), #dataset_secondChromRegion)
   
--- ######## Line too long (93 chars) ######## :
   val_targetVector = subtable(targetVector, (#targetVector-val_tuple_limit+1), #targetVector)
   
--- ######## Line too long (164 chars) ######## :
   dnaseDataTable_only_IDs_val = subtable(dnaseDataTable_only_IDs_training, (#dnaseDataTable_only_IDs_training-val_tuple_limit+1), #dnaseDataTable_only_IDs_training)
   
   -- We rearrange the training set
--- ######## Line too long (86 chars) ######## :
   temp_dnaseDataTable = subtable(dnaseDataTable, 1, (#dnaseDataTable-val_tuple_limit))
 
--- ######## Line too long (116 chars) ######## :
   temp_dataset_firstChromRegion = subtable(dataset_firstChromRegion, 1, (#dataset_firstChromRegion-val_tuple_limit))
 
--- ######## Line too long (119 chars) ######## :
   temp_dataset_secondChromRegion = subtable(dataset_secondChromRegion, 1, (#dataset_secondChromRegion-val_tuple_limit))
 
   temp_targetVector = subtable(targetVector, 1, (#targetVector-val_tuple_limit))
 
--- ######## Line too long (131 chars) ######## :
   dnaseDataTable_only_IDs_temp = subtable(dnaseDataTable_only_IDs_training, 1, (#dnaseDataTable_only_IDs_training-val_tuple_limit))
   
   -- We reassign the training set
@@ -1934,71 +1949,61 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZ
 end
 
  -- READIN' THE 2nd input training SET
--- ######## Line too long (143 chars) ######## :
 if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
  
- 
--- ######## Line too long (301 chars) ######## :
- local secondSpan_dataset_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, secondSpan_chrStart_locus, secondSpan_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeSpecific)
- 
- secondSpan_dataset_firstChromRegion = secondSpan_dataset_output[3];
- secondSpan_dataset_secondChromRegion = secondSpan_dataset_output[4];
- secondSpan_targetVector = secondSpan_dataset_output[5];      
- 
--- ######## Line too long (104 chars) ######## :
- dataset_firstChromRegion =  tableConcat(dataset_firstChromRegion, secondSpan_dataset_firstChromRegion);
--- ######## Line too long (107 chars) ######## :
- dataset_secondChromRegion =  tableConcat(dataset_secondChromRegion, secondSpan_dataset_secondChromRegion);
- targetVector =  tableConcat(targetVector, secondSpan_targetVector);
- 
+    local secondSpan_dataset_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, secondSpan_chrStart_locus, secondSpan_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeValidSet)
+    
+    secondSpan_dataset_firstChromRegion = secondSpan_dataset_output[3];
+    secondSpan_dataset_secondChromRegion = secondSpan_dataset_output[4];
+    secondSpan_targetVector = secondSpan_dataset_output[5];      
+    
+    dataset_firstChromRegion =  tableConcat(dataset_firstChromRegion, secondSpan_dataset_firstChromRegion);
+    dataset_secondChromRegion =  tableConcat(dataset_secondChromRegion, secondSpan_dataset_secondChromRegion);
+    targetVector =  tableConcat(targetVector, secondSpan_targetVector);
+  
 end
 
 else
 
--- ######## Line too long (94 chars) ######## :
-require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_RIGHT.lua"
--- ######## Line too long (93 chars) ######## :
-require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_LEFT.lua"
--- ######## Line too long (95 chars) ######## :
-require "../../visualization_data/chr21-46562780-47409790matrix_file_1459864690time_LABELS.lua"
+    require "../data/2016-04-05_datafiles/chr21-46562780-47409790matrix_file_1459864690time_RIGHT.lua"
+    require "../data/2016-04-05_datafiles/chr21-46562780-47409790matrix_file_1459864690time_LEFT.lua"
+    require "../data/2016-04-05_datafiles/chr21-46562780-47409790matrix_file_1459864690time_LABELS.lua"
 
-dataset_firstChromRegion = first_datasetGeneral
-dataset_secondChromRegion = second_datasetGeneral
-targetVector = targetDatasetGeneral
+    dataset_firstChromRegion = first_datasetGeneral
+    dataset_secondChromRegion = second_datasetGeneral
+    targetVector = targetDatasetGeneral
 
--- ######## Line too long (93 chars) ######## :
-require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_LEFT.lua"
--- ######## Line too long (94 chars) ######## :
-require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_RIGHT.lua"
--- ######## Line too long (95 chars) ######## :
-require "../../visualization_data/chr21-15630020-16234310matrix_file_1459874054time_LABELS.lua"
+    require "../data/2016-04-05_datafiles/chr21-15630020-16234310matrix_file_1459874054time_LEFT.lua"
+    require "../data/2016-04-05_datafiles/chr21-15630020-16234310matrix_file_1459874054time_RIGHT.lua"
+    require "../data/2016-04-05_datafiles/chr21-15630020-16234310matrix_file_1459874054time_LABELS.lua"
 
-val_dataset_firstChromRegion = first_datasetGeneral
-val_dataset_secondChromRegion = second_datasetGeneral
-val_targetVector = targetDatasetGeneral
+    val_dataset_firstChromRegion = first_datasetGeneral
+    val_dataset_secondChromRegion = second_datasetGeneral
+    val_targetVector = targetDatasetGeneral
 
--- TO REMOVE
--- dataset_firstChromRegion = val_dataset_firstChromRegion
--- dataset_secondChromRegion = val_dataset_secondChromRegion
--- targetVector = val_targetVector 
+    -- TO REMOVE
+    -- dataset_firstChromRegion = val_dataset_firstChromRegion
+    -- dataset_secondChromRegion = val_dataset_secondChromRegion
+    -- targetVector = val_targetVector 
 
 
-print("> > > > Data were read from files,  not from PostgreSQL < < < <");
+
+    print("> > > > Data were read from files,  not from PostgreSQL < < < <");
 
 
 end
 
 if dnaseExcludeColumn >= 1 and dnaseExcludeColumn <= CELL_TYPE_NUMBER then
-CELL_TYPE_NUMBER = CELL_TYPE_NUMBER -1
-print("siamese_nn_toy.lua: global CELL_TYPE_NUMBER = "..CELL_TYPE_NUMBER)
+  CELL_TYPE_NUMBER = CELL_TYPE_NUMBER -1
+  print("siamese_nn_toy.lua: global CELL_TYPE_NUMBER = "..CELL_TYPE_NUMBER)
 end
 
 local noIntersectiontimeStart = os.time()
 
 
--- ######## Line too long (92 chars) ######## :
-if (hicCellTypeSpecific~=-1 and hicCellTypeSpecific~="-1") or execution=="JUST-TESTING" then
-NO_INTERSECTION_BETWEEN_SETS = false
+
+if (hicCellTypeValidSet1~=-1 and hicCellTypeValidSet1~="-1") or execution=="JUST-TESTING" then
+  NO_INTERSECTION_BETWEEN_SETS = false
 end
 
 --	REMOVING DATA FROM THE VALIDATION SET
@@ -2061,14 +2066,6 @@ print("AFTER #val_targetVector = "..comma_value(#val_targetVector))
 end
 
 
--- -- TO REMOVE
--- dnaseDataTable = val_dnaseDataTable
--- dataset_firstChromRegion = val_dataset_firstChromRegion
--- dataset_secondChromRegion = val_dataset_secondChromRegion
--- targetVector = val_targetVector
-
-
-
 print("\nAFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
 -- ######## Line too long (83 chars) ######## :
 print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
@@ -2076,95 +2073,30 @@ print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegio
 print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
 print("AFTER #targetVector = "..comma_value(#targetVector))
 
---	REMOVING DATA FROM THE TRAINING SET
---
--- if NO_INTERSECTION_BETWEEN_SETS==true then
--- 
---     -- Remove the test set elements from the training set
---     print("Remove the test set elements from the training set");
---     print("before removal:")
---     print("BEFORE #dnaseDataTable = "..comma_value(#dnaseDataTable))
--- ######## Line too long (91 chars) ######## :
---     print("BEFORE #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
--- ######## Line too long (93 chars) ######## :
---     print("BEFORE #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
---     print("BEFORE #targetVector = "..comma_value(#targetVector))
--- 
---     local index = 1
---     local _size = #val_dnaseDataTable  
---     local kRate = 1
---     for k=1,_size do
---       
--- 	kRate=(k*100/_size)
--- 	if (kRate*10)%10==0 then 
--- 	    io.write(kRate.."% "); io.flush(); 
--- 	end
---       
--- ######## Line too long (91 chars) ######## :
--- 	local output_contains = chromRegionTableContains(dnaseDataTable, val_dnaseDataTable[k])
--- 	local label = output_contains[1]
--- 	--print("label = "..tostring(label))
--- 	local position = output_contains[2]
--- 	-- print("position = "..position)
--- 	if label  then
--- 	  io.write("(k="..comma_value(k).." remove)\t");
--- 	  io.flush();
--- 	  table.remove(dnaseDataTable, position);
--- 	  table.remove(dataset_firstChromRegion, position);
--- 	  table.remove(dataset_secondChromRegion, position);
--- 	  table.remove(targetVector, position);
--- 	  index = 1
--- 
--- 
--- 	else
--- 	  --io.write("\n");
--- 	  index = index +1 
--- 	end  	
---     end
---     
---     
--- ######## Line too long (121 chars) ######## :
---   printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
--- 
---   print("after removal:")
---   print("AFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
--- ######## Line too long (88 chars) ######## :
---   print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
--- ######## Line too long (90 chars) ######## :
---   print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
---   print("AFTER #targetVector = "..comma_value(#targetVector))
---       
--- end
-
-
-
-
--- 
--- print("\n#val_dnaseDataTable = "..#val_dnaseDataTable)
--- for k=1,#val_dnaseDataTable do
---   
--- ######## Line too long (120 chars) ######## :
---     io.write("chr"..val_dnaseDataTable[k][1].."_"..val_dnaseDataTable [k][2].."_"..val_dnaseDataTable[k][3].."\n");  
--- end
--- 
--- io.write("\n")
--- print("#dnaseDataTable = "..#dnaseDataTable)
--- for k=1,#dnaseDataTable do
---     
--- ######## Line too long (105 chars) ######## :
---     io.write("chr"..dnaseDataTable[k][1].."_"..dnaseDataTable[k][2].."_"..dnaseDataTable[k][3].."\n");
--- end
-
--- -- validation set == training set CHECK
--- val_dnaseDataTable = dnaseDataTable
--- val_dataset_firstChromRegion = dataset_firstChromRegion
--- val_dataset_secondChromRegion = dataset_secondChromRegion
--- val_targetVector = targetVector
-
 
 
 DATA_SIZE = #dataset_firstChromRegion;
 print("DATA_SIZE = ".. comma_value(DATA_SIZE));
+
+print("Data reading phase finished, let's close the connection");
+closeGlobalDbConnection();
+
+
+print("== Data reading recap ==")
+print("The training set contains Hi-C interactions of")
+if (hicCellTypeTrainingSet1~="-1" and hicCellTypeTrainingSet1~=-1) then print(hicCellTypeTrainingSet1) end
+if (hicCellTypeTrainingSet2~="-1" and hicCellTypeTrainingSet2~=-1) then print(hicCellTypeTrainingSet2) end
+if (hicCellTypeTrainingSet3~="-1" and hicCellTypeTrainingSet3~=-1) then print(hicCellTypeTrainingSet3) end
+if (hicCellTypeTrainingSet4~="-1" and hicCellTypeTrainingSet4~=-1) then print(hicCellTypeTrainingSet4) end
+print("The test set contains Hi-C interactions of")
+if (hicCellTypeValidSet1~="-1" and hicCellTypeValidSet1~=-1) then print(hicCellTypeValidSet1) end
+if (hicCellTypeValidSet2~="-1" and hicCellTypeValidSet2~=-1) then print(hicCellTypeValidSet2) end
+if (hicCellTypeValidSet3~="-1" and hicCellTypeValidSet3~=-1) then print(hicCellTypeValidSet2) end
+if (hicCellTypeValidSet4~="-1" and hicCellTypeValidSet4~=-1) then print(hicCellTypeValidSet4) end
+print("== == == == == ==")
+
+-- print("The program will stop")
+-- os.exit()
 
 
 PRINT_NUMBER = 1

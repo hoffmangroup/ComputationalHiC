@@ -28,11 +28,8 @@ trainingSetCellTypeName="HUVEC"
 hicCellTypeNameToHighlight="GM12878"
 hicCellTypeNumberToHighlight=26
 
-# hicCellTypeNameToHighlight="k562"
-# hicCellTypeNumberToHighlight=61
-
-# hicCellTypeNameToHighlight="IMR90"
-# hicCellTypeNumberToHighlight=57
+#hicCellTypeNameToHighlight="k562"
+#hicCellTypeNumberToHighlight=61
 
 #hicCellTypeNameToHighlight="HUVEC"
 #hicCellTypeNumberToHighlight=55
@@ -44,7 +41,7 @@ execution="SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"
 
 #tupleLimit=20000
 
-tupleLimit=30000
+tupleLimit=20000
 proportion=1000
 mem_size=$((tupleLimit / proportion))
 #mem_size=48

@@ -12,6 +12,58 @@ PRINT_AVERAGES = false
 
 printOnce = true
 
+-- DATABASE CONNECTION global connection tools
+driver = require "luasql.postgres"
+env = nil
+con = nil
+
+-- Function that checks if a connection to the database is open or not
+function isGlobalDbConnectionOpen()
+  
+  local statusString = ""
+  if con==nil then 
+    statusString = "closed"
+  else
+    statusString = (tostring(con):match"closed" and "closed" or "open")
+  end
+  
+  if statusString=="open" then return true;
+  elseif statusString=="closed" then return false;
+  end
+end
+
+-- Function which opens the global connection to the database on the global con and env variables
+function openGlobalDbConnection()
+  
+  if (isGlobalDbConnectionOpen()==true) then
+    
+    print("The global database connection is already open, so the system will not open it again and will return the current global connection")
+    
+  else
+      
+    print("The global database connection is CLOSED, so the system will open it and return it")
+    -- create environment object
+    env = assert(driver.postgres());
+    -- connect to data source  
+    con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
+  end
+  
+  return con;
+  
+end  
+  
+
+-- Function which closes the global connection to the database on the global con and env variables
+function closeGlobalDbConnection() 
+  
+ if (isGlobalDbConnectionOpen()==true) then
+    con:close();
+    env:close();
+  end
+  print("The global database connection is CLOSED")
+end
+
+
 -- Function that takes a chromRegion profile pair, the original dnase table, the indices of the positions, and returns the id's of the selected pair
 function fromProfileToChromRegionCoupleId_Thurman2012data(chromSel, profileFirst, profileSecond, dnaseDataTable, first_profile_initial, first_profile_finish, second_profile_initial, second_profile_finish, last_index)
   
@@ -208,7 +260,7 @@ end
 
 -- Function that generates the command to retrieve each singular row in then
 -- PostgreSQL query
-function sqlRowRetrieverCommand(row, dataSource, labelValue, first_profile_initial, second_profile_finish, dnaseExcludeColumnNumber, dnaseExcludeColumnName, thisCellTypeNumber)
+function sqlRowRetrieverCommand(row, dataSource, labelValue, first_profile_initial, second_profile_finish, dnaseExcludeColumnNumber, dnaseExcludeColumnName, numberOfCellTypes)
 
   local readTensor = {}
   
@@ -255,12 +307,12 @@ function sqlRowRetrieverCommand(row, dataSource, labelValue, first_profile_initi
   
   local newReadTensor = torch.Tensor();
   
-  if dnaseExcludeColumnNumber>=1 and dnaseExcludeColumnNumber<=(thisCellTypeNumber+1) then   
+  if dnaseExcludeColumnNumber>=1 and dnaseExcludeColumnNumber<=(numberOfCellTypes+1) then   
     
     local columnNames = getColumnNamesOfTable("chromregionprofiles")
     
     if printOnce == true then
-      print("EXCLUDING THE FEATURE "..dnaseExcludeColumnName.." number "..dnaseExcludeColumnNumber.." among "..(thisCellTypeNumber+1));
+      print("EXCLUDING THE FEATURE "..dnaseExcludeColumnName.." number "..dnaseExcludeColumnNumber.." among "..(numberOfCellTypes+1));
       printOnce = false
     end
     
@@ -370,14 +422,6 @@ end
 -- function that divides the genome into N spans having a fixed span size
 function selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize, dataSource)  
       
-    -- load driver
-  local driver = require "luasql.postgres"
-  -- create environment object
-  local env = assert (driver.postgres());
-  -- connect to data source  
-  local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-  
-  
   -- retrieve the position of the first locus
   local sql_query_count_interactions = "";
     
@@ -405,15 +449,14 @@ function selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize
 --   os.exit();
 --   
    -- retrieve a cursor
-  local cur = assert (con:execute(string.format([[%s]], sql_query_count_interactions)));	  
+  local cur = assert(openGlobalDbConnection():execute(string.format([[%s]], sql_query_count_interactions)));	  
 
   -- print all rows, the rows will be indexed by field names
   local row = cur:fetch ({}, "a");
 
   local number_of_interactions = tonumber(row.count);
   cur:close(); -- already closed because all the result set was consumed
-  con:close();
-  env:close();
+  -- closeGlobalDbConnection()
   
   print("number_of_interactions="..comma_value(number_of_interactions));
   
@@ -439,18 +482,13 @@ function selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize
     local rate = round(i*100/numSpans,2);
     io.write("[rate="..rate.."%] ");
     io.flush();
-    
-     local env = assert (driver.postgres());
-     -- connect to data source  
-     local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-       
       
       local row_number = (i*true_interactions_spanSize)-true_interactions_spanSize+1
 	-- retrieve the position of the first locus
       sql_query_first_locus_start = specificInteractionQuery(chromSel, row_number, dataSource, "start");
       
         -- retrieve a cursor
-	local cur2 = assert (con:execute(string.format([[%s]], sql_query_first_locus_start)));	  
+	local cur2 = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_first_locus_start)));	  
 
 	local row2 = cur2:fetch ({}, "a");
 	local first_locus_start = tonumber(row2.cr1_chrstart);
@@ -468,7 +506,7 @@ function selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize
        -- print("\n\tsql_query_last_locus_end: "..sql_query_last_locus_end);
       
               -- retrieve a cursor
-	local cur3 = assert (con:execute(string.format([[%s]], sql_query_last_locus_end)));
+	local cur3 = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_last_locus_end)));
 		-- print(sql_query_last_locus_end);
 	local row3 = cur3:fetch ({}, "a");
 	local last_locus_end = tonumber(row3.cr1_chrend);
@@ -476,8 +514,7 @@ function selectGenomeSpanIndices_bySpanSize(chromSel, true_interactions_spanSize
 	    
      print("(i="..i..") first_locus_start="..comma_value(first_locus_start).."\tlast_locus_end="..comma_value(last_locus_end));
      
-     con:close();
-     env:close();
+     -- closeGlobalDbConnection()
      
      indices_start[i] = first_locus_start;
      indices_end[i] = last_locus_end;
@@ -511,15 +548,7 @@ end
 
 -- function that divides the genome into numSpans spans and return the indices
 function selectGenomeSpanIndices_byNumSpans(chromSel, numSpans, dataSource)
-    
-  -- load driver
-  local driver = require "luasql.postgres"
-  -- create environment object
-  local env = assert (driver.postgres());
-  -- connect to data source  
-  local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-  
-  
+      
   -- retrieve the position of the first locus
   local sql_query_first_locus = "";
   
@@ -545,7 +574,7 @@ function selectGenomeSpanIndices_byNumSpans(chromSel, numSpans, dataSource)
   io.flush();
 
   -- retrieve a cursor
-  local  cur = assert (con:execute(string.format([[%s]], sql_query_first_locus)));	  
+  local  cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_first_locus)));	  
 
   -- print all rows, the rows will be indexed by field names
   local row = cur:fetch ({}, "a");
@@ -580,7 +609,7 @@ function selectGenomeSpanIndices_byNumSpans(chromSel, numSpans, dataSource)
    io.flush();
 
    -- retrieve a cursor
-   local cur2 = assert (con:execute(string.format([[%s]], sql_query_last_locus)));
+   local cur2 = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_last_locus)));
 	  
 
     -- print all rows, the rows will be indexed by field names
@@ -592,8 +621,7 @@ function selectGenomeSpanIndices_byNumSpans(chromSel, numSpans, dataSource)
     -- close everything
 
     cur2:close(); -- already closed because all the result set was consumed
-    con:close();
-    env:close();
+    -- closeGlobalDbConnection()
     
     -- ### Compute the indices
     
@@ -675,17 +703,10 @@ function getColumnNamesOfTable(tableName)
   
 	--print("getColumnNamesOfTable(tableName) START");
   
-	-- load driver
-	local driver = require "luasql.postgres";
-	-- create environment object
-	local env = assert(driver.postgres());
-	-- connect to data source
-	local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-  
 	local sql_query = "SELECT * FROM information_schema.columns WHERE table_name   = '"..tableName.."';"
 		
 	-- print("\n sql_query: "..sql_query)
-	local cur = assert (con:execute(string.format([[%s]], sql_query)));	  
+	local cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query)));	  
 
 	-- print all rows, the rows will be indexed by field names
 	local row = cur:fetch ({}, "a");	
@@ -700,8 +721,7 @@ function getColumnNamesOfTable(tableName)
 	end
 		
 	cur:close(); -- already closed because all the result set was consumed
-	con:close();
-	env:close();
+	-- closeGlobalDbConnection()
 
 	--print("getColumnNamesOfTable(tableName) END");
 	
@@ -723,18 +743,11 @@ function fromIdToChromRegion(chromSel, chromRegionId)
 
     -- print("chromRegionId "..chromRegionId);
   
-	-- load driver
-	local driver = require "luasql.postgres";
-	-- create environment object
-	local env = assert(driver.postgres());
-	-- connect to data source
-	local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-  
 	local sql_query = "SELECT id_chr, id_region,  chrstart, chrend FROM chromregions AS cr WHERE cr.id_region="..tonumber(chromRegionId).." AND cr.id_chr="..tonumber(chrNumber)..";"
 	
 	
 	-- print("\n sql_query: "..sql_query)
-	local cur = assert (con:execute(string.format([[%s]], sql_query)));	  
+	local cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query)));	  
 
 	-- print all rows, the rows will be indexed by field names
 	local row = cur:fetch ({}, "a");	
@@ -747,8 +760,7 @@ function fromIdToChromRegion(chromSel, chromRegionId)
 	end
 		
 	cur:close(); -- already closed because all the result set was consumed
-	con:close();
-	env:close();
+	-- closeGlobalDbConnection()
 
 	return chromRegionProfile;
 end
@@ -891,7 +903,7 @@ end
 -- ### USING THIS ###
 function dbThurman2012profiles_on_Miriam2014hicinteractions_query(chrNumber, chromSel, chrStart_locus, chrEnd_locus, tuple_limit, hicCellTypeToExclude, hicCellTypeToConsider)
   
-  io.write("dbThurman2012profiles_on_Miriam2014hicinteractions_query() ")
+  print("dbThurman2012profiles_on_Miriam2014hicinteractions_query() ")
   if(tonumber(hicCellTypeToExclude)~=-1) then print("EXCLUDING "..hicCellTypeToExclude .." cell type") end
   if(tonumber(hicCellTypeToConsider)~=-1) then print("CONSIDERING only ".. hicCellTypeToConsider .." cell type") end
   
@@ -929,14 +941,15 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query(chrNumber, chr
 
   if chromSel~= "chr0" then sql_query = sql_query .." c.name='"..chromSel.. "' AND "; end
   
-  if (tonumber(hicCellTypeToExclude)==-1  and tonumber(hicCellTypeToConsider)==-1) then
-    print("Error: select a cell type to exclude OR to consider for the Hi-C dataset. The program will stop");
-    os.exit();
-  end
+--   if (tonumber(hicCellTypeToExclude)==-1  and tonumber(hicCellTypeToConsider)==-1) then
+--     print("Error: select a cell type to exclude OR to consider for the Hi-C dataset. The program will stop");
+--     os.exit();
+--   end
   
   if hicCellTypeToExclude~=-1 and hicCellTypeToExclude~="-1" then
     sql_query = sql_query .. " celltype <> '".. hicCellTypeToExclude .."' AND "
-  elseif hicCellTypeToConsider~=-1 and hicCellTypeToConsider~="-1" then
+  end
+  if hicCellTypeToConsider~=-1 and hicCellTypeToConsider~="-1" then
     sql_query = sql_query .. " celltype = '".. hicCellTypeToConsider .."' AND "
   end  
   
@@ -949,8 +962,152 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query(chrNumber, chr
 
   sql_query = sql_query .. ";"    
 
-  -- print("\n\n\n"..sql_query.."\n\n\n");
-  -- os.exit();
+--   print("\n\n\n"..sql_query.."\n\n\n");
+--   os.exit();
+    
+  return sql_query;
+  
+end
+
+-- Function that creates the Sql query that reads the Thurman2012 chromosome profiles of the hic interactions from the PostgreSQL database Miriam2014 dataset, shared by 2, 3, 4 cell types if requested
+function dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(chrNumber, chromSel, chrStart_locus, chrEnd_locus, tuple_limit, hicCellTypeToExclude1, hicCellTypeToExclude2, hicCellTypeToExclude3, hicCellTypeToExclude4, hicCellTypeToConsider1,  hicCellTypeToConsider2,  hicCellTypeToConsider3,  hicCellTypeToConsider4 )
+  
+  print("dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types() ")
+  if(tonumber(hicCellTypeToExclude1)~=-1) then print("EXCLUDING "..hicCellTypeToExclude1 .." cell type") end
+  if(tonumber(hicCellTypeToExclude2)~=-1) then print("EXCLUDING "..hicCellTypeToExclude2 .." cell type") end
+  if(tonumber(hicCellTypeToExclude3)~=-1) then print("EXCLUDING "..hicCellTypeToExclude3 .." cell type") end
+  if(tonumber(hicCellTypeToExclude4)~=-1) then print("EXCLUDING "..hicCellTypeToExclude4 .." cell type") end
+  if(tonumber(hicCellTypeToConsider1)~=-1) then print("CONSIDERING ".. hicCellTypeToConsider1 .." cell type") end
+  if(tonumber(hicCellTypeToConsider2)~=-1) then print("CONSIDERING ".. hicCellTypeToConsider2 .." cell type") end
+  if(tonumber(hicCellTypeToConsider3)~=-1) then print("CONSIDERING ".. hicCellTypeToConsider3 .." cell type") end
+  if(tonumber(hicCellTypeToConsider4)~=-1) then print("CONSIDERING ".. hicCellTypeToConsider4 .." cell type") end
+  
+  local sql_query = dbThurman2012_column_selection_query_subpart(chrNumber);
+
+  sql_query = sql_query .."  FROM hic_interactions_with_labels_and_ids AS hic_inte "..
+  -- we retrieve the hic start and end of the 1st chrom region
+  " JOIN chromregions AS cr1 "..
+  " ON hic_inte.id_region1=cr1.id_region "..
+
+  -- we retrieve the hic start and end of the 2nd chrom region
+  " JOIN chromregions AS cr2 "..
+  " ON hic_inte.id_region2=cr2.id_region "..
+
+  " JOIN chromregionprofiles AS crp1 "..
+  " ON cr1.id_region=crp1.id_region "..
+  " JOIN chromregionprofiles AS crp2 "..
+  " ON cr2.id_region=crp2.id_region "..
+  
+  " JOIN chromosomes AS c "..
+  " ON (c.id_chr=cr1.id_chr AND c.id_chr=cr2.id_chr) WHERE ";
+
+  if chromSel~= "chr0" then sql_query = sql_query .." c.name='"..chromSel.. "' AND "; end
+  
+--   if (tonumber(hicCellTypeToExclude)==-1  and tonumber(hicCellTypeToConsider)==-1) then
+--     print("Error: select a cell type to exclude OR to consider for the Hi-C dataset. The program will stop");
+--     os.exit();
+--   end
+
+   -- 1st cell type to include
+  if hicCellTypeToConsider1~=-1 and hicCellTypeToConsider1~="-1" then
+    sql_query = sql_query .. " celltype = '".. hicCellTypeToConsider1 .."' AND "
+  end  
+  
+  sql_query = sql_query .." cr1.chrstart>="..tonumber(chrStart_locus).." AND cr1.chrend<"..tonumber(chrEnd_locus).."    "..
+  " AND cr2.chrstart>="..tonumber(chrStart_locus).." AND cr2.chrend<"..tonumber(chrEnd_locus)..
+  " AND crp1.id_region <> crp2.id_region ";
+  
+  -- 2nd cell type to include
+  if hicCellTypeToConsider2~=-1 and hicCellTypeToConsider2~="-1" then
+      sql_query = sql_query .." AND EXISTS ( "..
+      " SELECT 1 "..
+      " FROM hic_interactions_with_labels_and_ids AS hic_inte  "..
+      " JOIN chromregions AS cr1b ON hic_inte.id_region1=cr1b.id_region  "..
+      " JOIN chromregions AS cr2b ON hic_inte.id_region2=cr2b.id_region  "..
+      " JOIN chromregionprofiles AS crp1b  ON cr1b.id_region=crp1b.id_region  "..
+      " JOIN chromregionprofiles AS crp2b  ON cr2b.id_region=crp2b.id_region  "..
+      " JOIN chromosomes AS c_bis ON (c_bis.id_chr=cr1b.id_chr AND c_bis.id_chr=cr2b.id_chr) "..
+      " WHERE c_bis.name='"..chromSel.. "' AND  "..
+      " celltype = '"..hicCellTypeToConsider2.."'  AND  "..
+      " ((crp1.id_region = cr1b.id_region AND "..
+      " crp2.id_region = cr2b.id_region) OR "..
+      " (crp2.id_region = cr1b.id_region AND "..
+      " crp1.id_region = cr2b.id_region) ) AND "..
+      " crp1b.id_region <> crp2b.id_region "..
+      " ) "
+  end
+  
+  -- 3rd cell type to include
+  if hicCellTypeToConsider3~=-1 and hicCellTypeToConsider3~="-1" then
+      sql_query = sql_query .." AND EXISTS ( "..
+        " SELECT 1 "..
+	" FROM hic_interactions_with_labels_and_ids AS hic_inte   "..
+	" JOIN chromregions AS cr1c ON hic_inte.id_region1=cr1c.id_region   "..
+	" JOIN chromregions AS cr2c ON hic_inte.id_region2=cr2c.id_region   "..
+	" JOIN chromregionprofiles AS crp1c  ON cr1c.id_region=crp1c.id_region  ".. 
+	" JOIN chromregionprofiles AS crp2c  ON cr2c.id_region=crp2c.id_region   "..
+	" JOIN chromosomes AS c_ter ON (c_ter.id_chr=cr1c.id_chr AND c_ter.id_chr=cr2c.id_chr)  "..
+	" WHERE c_ter.name='"..chromSel.. "' AND   "..
+	" celltype = '"..hicCellTypeToConsider3.."'  AND   "..
+	" ((crp1.id_region = cr1c.id_region AND "..
+	" crp2.id_region = cr2c.id_region) OR  "..
+	" (crp2.id_region = cr1c.id_region AND "..
+	" crp1.id_region = cr2c.id_region) ) AND "..
+	" crp1c.id_region <> crp2c.id_region "..
+	" ) "
+  end
+  
+  -- 4th cell type to include
+  if hicCellTypeToConsider4~=-1 and hicCellTypeToConsider4~="-1" then
+      sql_query = sql_query .." AND EXISTS ( "..
+	" SELECT 1 "..
+	" FROM hic_interactions_with_labels_and_ids AS hic_inte   "..
+	" JOIN chromregions AS cr1d ON hic_inte.id_region1=cr1d.id_region   "..
+	" JOIN chromregions AS cr2d ON hic_inte.id_region2=cr2d.id_region   "..
+	" JOIN chromregionprofiles AS crp1d  ON cr1d.id_region=crp1d.id_region   "..
+	" JOIN chromregionprofiles AS crp2d  ON cr2d.id_region=crp2d.id_region   "..
+	" JOIN chromosomes AS c_quater ON (c_quater.id_chr=cr1d.id_chr AND  "..
+	" c_quater.id_chr=cr2d.id_chr)  "..
+	" WHERE c_quater.name='"..chromSel.. "' AND   "..
+	" celltype = '"..hicCellTypeToConsider4.."'  AND   "..
+	" ((crp1.id_region = cr1d.id_region AND "..
+	" crp2.id_region = cr2d.id_region) OR  "..
+	" (crp2.id_region = cr1d.id_region AND "..
+	" crp1.id_region = cr2d.id_region) ) AND "..
+	" crp1d.id_region <> crp2d.id_region "..
+	" ) "
+  end
+  
+  -- All the 1,2,3,4 cell type to exclude
+  if hicCellTypeToExclude1~=-1 and hicCellTypeToExclude1~="-1" then
+      sql_query = sql_query .." AND NOT EXISTS ( "..
+      " SELECT 1 "..
+      " FROM hic_interactions_with_labels_and_ids AS hic_inte  "..
+      " JOIN chromregions AS cr1e ON hic_inte.id_region1=cr1e.id_region  "..
+      " JOIN chromregions AS cr2e ON hic_inte.id_region2=cr2e.id_region  "..
+      " JOIN chromregionprofiles AS crp1e  ON cr1e.id_region=crp1e.id_region  "..
+      " JOIN chromregionprofiles AS crp2e  ON cr2e.id_region=crp2e.id_region  "..
+      " JOIN chromosomes AS c_five ON (c_five.id_chr=cr1e.id_chr AND c_five.id_chr=cr2e.id_chr) "..
+      " WHERE c_five.name='"..chromSel.. "' AND  "..
+      " (celltype = '"..hicCellTypeToExclude1.."' OR  "..
+      " celltype = '"..hicCellTypeToExclude2.."' OR  "..
+      " celltype = '"..hicCellTypeToExclude3.."' OR  "..
+      " celltype = '"..hicCellTypeToExclude4.."')  "..
+      " AND ((crp1.id_region = cr1e.id_region AND "..
+      " crp2.id_region = cr2e.id_region) OR "..
+      " (crp2.id_region = cr1e.id_region AND "..
+      " crp1.id_region = cr2e.id_region) ) AND "..
+      " crp1e.id_region <> crp2e.id_region "..
+      " ) "
+  end
+
+  sql_query = sql_query.. " ORDER BY random() ";
+  if tuple_limit ~= -1 and tuple_limit ~= "-1" then sql_query = sql_query .. " LIMIT "..tuple_limit; end
+
+  sql_query = sql_query .. ";"    
+
+ --  print("\n\n\n"..sql_query.."\n\n\n");
+ -- os.exit();
     
   return sql_query;
   
@@ -1099,8 +1256,9 @@ function dbThurman2012profiles_on_Miriam2014falseinteractions_query(chrNumber, c
   
   if hicCellTypeToExclude~=-1 and hicCellTypeToExclude~="-1" then
      sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToExclude .."' "
-  elseif hicCellTypeToConsider~=-1 and hicCellTypeToConsider~="-1" then
-     sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToConsider .."' "
+  end
+  if hicCellTypeToConsider~=-1 and hicCellTypeToConsider~="-1" then
+     sql_query = sql_query .. " AND celltype = '".. hicCellTypeToConsider .."' "
   end  
   
   sql_query = sql_query .. " ) )   " ;
@@ -1118,26 +1276,129 @@ function dbThurman2012profiles_on_Miriam2014falseinteractions_query(chrNumber, c
   -- "  ORDER BY crp1_id_region, crp2_id_region "
 	
 	
-	-- if lengthTrues~=0 and lengthTrues~=-1 and (original_tuple_limit == -1 or original_tuple_limit == "-1") then sql_query = sql_query ..	 " LIMIT "..lengthTrues 
+  -- if lengthTrues~=0 and lengthTrues~=-1 and (original_tuple_limit == -1 or original_tuple_limit == "-1") then sql_query = sql_query ..	 " LIMIT "..lengthTrues 
 	-- else
-	if (original_tuple_limit ~= -1 and original_tuple_limit ~= "-1") then sql_query = sql_query ..	 " LIMIT "..original_tuple_limit..";\n" 
+    if (original_tuple_limit ~= -1 and original_tuple_limit ~= "-1") then sql_query = sql_query ..	 " LIMIT "..original_tuple_limit..";\n" 
 
-	end
+    end
 
 	
 	-- if balancedFlag==false then sql_query = sql_query .. " LIMIT "..tonumber(lengthTrues*2) end -- JUST FOR TRYIN' @@@
 	
-	sql_query = sql_query .. ";"
+    sql_query = sql_query .. ";"
 
--- 	 print("\t\nsql_query = \n" ..sql_query);
--- 	 io.flush();
--- 	os.exit();
+--     print("\t\nsql_query = \n" ..sql_query);
+--     io.flush();
+--     os.exit();
 	
-	return sql_query;  
+    return sql_query;  
 end
 
+
+-- Function that creates the Sql query that reads the Thurman2012 profiles of the  Miriam2014 FALSE interactions from the PostgreSQL database, for the 4 cell types
+function dbThurman2012profiles_on_Miriam2014falseinteractions_query_4_cell_types(chrNumber, chromSel, chrStart_locus, chrEnd_locus, locus_position_limit, lengthTrues, balancedFlag, original_tuple_limit, hicCellTypeToExclude1, hicCellTypeToExclude2, hicCellTypeToExclude3, hicCellTypeToExclude4, hicCellTypeToConsider1, hicCellTypeToConsider2, hicCellTypeToConsider3, hicCellTypeToConsider4)
+  
+  print("dbThurman2012profiles_on_Miriam2014falseinteractions_query_4_cell_types() ")
+  if(tonumber(hicCellTypeToExclude1)~=-1) then print("EXCLUDING "..hicCellTypeToExclude1 .." cell type") end
+  if(tonumber(hicCellTypeToExclude2)~=-1) then print("EXCLUDING "..hicCellTypeToExclude2 .." cell type") end
+  if(tonumber(hicCellTypeToExclude3)~=-1) then print("EXCLUDING "..hicCellTypeToExclude3 .." cell type") end
+  if(tonumber(hicCellTypeToExclude4)~=-1) then print("EXCLUDING "..hicCellTypeToExclude4 .." cell type") end
+  if(tonumber(hicCellTypeToConsider1)~=-1) then print("CONSIDERING only ".. hicCellTypeToConsider1 .." cell type") end
+  if(tonumber(hicCellTypeToConsider2)~=-1) then print("CONSIDERING only ".. hicCellTypeToConsider2 .." cell type") end
+  if(tonumber(hicCellTypeToConsider3)~=-1) then print("CONSIDERING only ".. hicCellTypeToConsider3 .." cell type") end
+  if(tonumber(hicCellTypeToConsider4)~=-1) then print("CONSIDERING only ".. hicCellTypeToConsider4 .." cell type") end
+ 
+--   print("false_tuple_limit = "..comma_value(original_tuple_limit));
+  
+  local sql_query = dbThurman2012_column_selection_query_subpart(chrNumber);
+  
+  sql_query = sql_query .." FROM chromregions AS cr1   " ..
+  " CROSS JOIN chromregions AS cr2   " ..
+  " JOIN chromosomes AS c   " ..
+  " ON (c.id_chr=cr1.id_chr AND c.id_chr=cr2.id_chr)   " ..
+  " JOIN chromregionprofiles AS crp1  ON crp1.id_region = cr1.id_region   " ..
+  " JOIN chromregionprofiles AS crp2  ON crp2.id_region = cr2.id_region   " ..
+  " WHERE cr1.id_region <> cr2.id_region  " ..
+  -- that are not in the trueinteractions   " ..
+  " AND NOT EXISTS (     " ..
+  "   SELECT 1     " ..
+  "   FROM hic_interactions_with_labels_and_ids AS hic_inte " ..
+    -- we retrieve the hic start and end of the 1st chrom region
+  "   JOIN chromregions AS cr1x " ..
+  "   ON hic_inte.id_region1=cr1x.id_region " ..
+    -- we retrieve the hic start and end of the 2nd chrom region
+  "   JOIN chromregions AS cr2x " ..
+  "   ON hic_inte.id_region2=cr2x.id_region " ..
+  
+  "   WHERE (cr1x.id_region = cr1.id_region AND "..
+  "   cr2x.id_region = cr2x.id_region "
+  
+  if (tonumber(hicCellTypeToExclude)==-1  and tonumber(hicCellTypeToConsider)==-1) then
+    print("Error: select a cell type to exclude OR to consider for the Hi-C dataset. The program will stop");
+    os.exit();
+  end
+  
+  -- Cell types to exclude
+  if hicCellTypeToExclude1~=-1 and hicCellTypeToExclude1~="-1" then
+     sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToExclude1 .."' "
+  end
+  if hicCellTypeToExclude2~=-1 and hicCellTypeToExclude2~="-1" then
+     sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToExclude2 .."' "
+  end
+  if hicCellTypeToExclude3~=-1 and hicCellTypeToExclude3~="-1" then
+     sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToExclude3 .."' "
+  end
+  if hicCellTypeToExclude4~=-1 and hicCellTypeToExclude4~="-1" then
+     sql_query = sql_query .. " AND celltype <> '".. hicCellTypeToExclude4 .."' "
+  end
+  
+  -- Cell types to include
+  if hicCellTypeToConsider1~=-1 and hicCellTypeToConsider1~="-1" then
+     sql_query = sql_query .. " AND (celltype = '".. hicCellTypeToConsider1 .."' "
+  end  
+  if hicCellTypeToConsider2~=-1 and hicCellTypeToConsider2~="-1" then
+     sql_query = sql_query .. " OR celltype = '".. hicCellTypeToConsider2 .."' "
+  end  
+  if hicCellTypeToConsider3~=-1 and hicCellTypeToConsider3~="-1" then
+     sql_query = sql_query .. " OR celltype = '".. hicCellTypeToConsider3 .."' "
+  end  
+  if hicCellTypeToConsider4~=-1 and hicCellTypeToConsider4~="-1" then
+     sql_query = sql_query .. " OR celltype = '".. hicCellTypeToConsider4 .."' "
+  end  
+  
+  sql_query = sql_query .. " ) ) )  " ;
+  
+  if chromSel~="chr0" then sql_query = sql_query .. " AND c.name='"..chromSel.. "' "; end 
+
+  
+  sql_query = sql_query .. " AND (cr1.chrend - cr2.chrstart <"..locus_position_limit.. ") " ..
+  " AND (cr2.chrend - cr1.chrstart <"..locus_position_limit.. ") " ..
+  " AND cr1.chrstart>="..tonumber(chrStart_locus)..
+  " AND cr1.chrend<"..tonumber(chrEnd_locus)..
+  " AND cr2.chrstart>="..tonumber(chrStart_locus)..
+  " AND cr2.chrend<"..tonumber(chrEnd_locus) .." ORDER BY random() "
+  -- "  ORDER BY crp1_id_region, crp2_id_region "
+	
+    if (original_tuple_limit ~= -1 and original_tuple_limit ~= "-1") then sql_query = sql_query ..	 " LIMIT "..original_tuple_limit..";\n" 
+
+    end
+
+		
+    sql_query = sql_query .. ";"
+
+    -- print("\t\nsql_query = \n" ..sql_query);
+    -- io.flush();
+    -- os.exit();
+	
+    return sql_query;  
+end
+
+-- Previous function content:
+-- function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, numberOfCellTypes, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeToExclude, hicCellTypeToConsider)
+
 -- Function that reads a particular segment of the input dataset
-function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, thisCellTypeNumber, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeToExclude, hicCellTypeToConsider)
+-- The "dnaseExcludeColumn" parameter was initially inserted to remove one specific DNase column from the neural network, but it's not used anymore
+function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, numberOfCellTypes, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeToExclude1, hicCellTypeToExclude2, hicCellTypeToExclude3, hicCellTypeToExclude4, hicCellTypeToConsider1, hicCellTypeToConsider2, hicCellTypeToConsider3, hicCellTypeToConsider4)
 
 	local timeStart = os.time();
 	tuple_limit = tonumber(tuple_limit);
@@ -1150,52 +1411,48 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	original_tuple_limit = tuple_limit;
 	print(" original_tuple_limit = "..comma_value(original_tuple_limit));
 	print("balancedFalsePerc = "..tonumber(balancedFalsePerc));
+	
 	print("dnaseExcludeColumn = "..dnaseExcludeColumn);
-	print("hicCellTypeToExclude = "..tostring(hicCellTypeToExclude));
-	print("hicCellTypeToConsider = "..tostring(hicCellTypeToConsider));
+	
+	io.write("\nThe Hi-C interactions of the following cell types will be excluded from the data reading:\n");
+	io.flush();
+	if (hicCellTypeToExclude1 ~= "-1" and hicCellTypeToExclude1 ~= -1) then io.write(hicCellTypeToExclude1.."\n"); io.flush(); end
+	if (hicCellTypeToExclude2 ~= "-1" and hicCellTypeToExclude2 ~= -1) then io.write(hicCellTypeToExclude2.."\n"); io.flush(); end
+	if (hicCellTypeToExclude3 ~= "-1" and hicCellTypeToExclude3 ~= -1) then io.write(hicCellTypeToExclude3.."\n"); io.flush(); end
+	if (hicCellTypeToExclude4 ~= "-1" and hicCellTypeToExclude4 ~= -1) then io.write(hicCellTypeToExclude4.."\n"); io.flush(); end
+	
+	io.write("\nOnly the Hi-C interactions of the following cell types will be included in the data reading:\n");
+	io.flush();
+	if (hicCellTypeToConsider1 ~= "-1" and hicCellTypeToConsider1 ~= -1) then io.write(hicCellTypeToConsider1.."\n"); io.flush(); end
+	if (hicCellTypeToConsider2 ~= "-1" and hicCellTypeToConsider2 ~= -1) then io.write(hicCellTypeToConsider2.."\n"); io.flush(); end
+	if (hicCellTypeToConsider3 ~= "-1" and hicCellTypeToConsider3 ~= -1) then io.write(hicCellTypeToConsider3.."\n"); io.flush(); end
+	if (hicCellTypeToConsider4 ~= "-1" and hicCellTypeToConsider4 ~= -1) then io.write(hicCellTypeToConsider4.."\n"); io.flush(); end
+	io.write("\n")
 	
 	local dnaseExcludeColumnName = "";
-	if dnaseExcludeColumn>=1 and dnaseExcludeColumn<=thisCellTypeNumber then
+	if dnaseExcludeColumn>=1 and dnaseExcludeColumn<=numberOfCellTypes then
 	  local columnNames = getColumnNamesOfTable("chromregionprofiles")
 	  dnaseExcludeColumnName = columnNames[dnaseExcludeColumn]
-	  print("EXCLUDING THE FEATURE-COLUMN "..dnaseExcludeColumnName.." number "..dnaseExcludeColumn.." among "..thisCellTypeNumber);
+	  print("EXCLUDING THE FEATURE-COLUMN "..dnaseExcludeColumnName.." number "..dnaseExcludeColumn.." among "..numberOfCellTypes);
+	elseif (dnaseExcludeColumn==-1 or dnaseExcludeColumn=="-1") then
+	  print("No DNase column will be excluded in the data reading");
 	end
-	
-	-- os.execute("sleep "..tonumber(1));
 		
 	local tmp = chromSel:gsub("chr","");
 	local chrNumber = tmp;
 	if (tmp=="X") then chrNumber = 23; 
 	elseif (tmp=="Y") then chrNumber = 24;
 	else chrNumber = tonumber(tmp);
-	end
-
-	-- load driver
-	local driver = require "luasql.postgres";
-	-- create environment object
-	local env = assert (driver.postgres());
-	-- connect to data source
-	local con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
+	end	
 	
 	local sql_query_true_interactions = "";
 	
 	local true_tuple_limit = tonumber(tuple_limit);
 	local false_tuple_limit = tonumber(tuple_limit);
 	if tuple_limit~=-1 then 
-	  
-	  -- 50% balance
-	  -- true_tuple_limit = round(tuple_limit/2,0);
-	  -- false_tuple_limit = round(tuple_limit/2,0); 
-	  
-	  -- 75% 25% balance
 	  false_tuple_limit = round(tuple_limit*tonumber(balancedFalsePerc)/100,0);
 	  true_tuple_limit = tuple_limit - false_tuple_limit
-	  -- round(tuple_limit*tonumber(100-balancedFalsePerc)/100,0);	  
-	    -- TO FIX BETTER
-	  -- print("NOVELTY: balanced dataset, "..comma_value(true_tuple_limit).." positives and "..comma_value(false_tuple_limit).." negatives");
-	end
-	
-	
+	end	
 	
 	
 	if dataSource=="Thurman2012" then 
@@ -1203,31 +1460,26 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	elseif dataSource=="Miriam2014" then 
 	  sql_query_true_interactions = dbMiriam2014profiles_on_Miriam2014hicinteractions_query(chrNumber, chromSel, chrStart_locus, chrEnd_locus, true_tuple_limit); 
 	elseif dataSource=="Thurman_Miriam" then
-	  sql_query_true_interactions = dbThurman2012profiles_on_Miriam2014hicinteractions_query(chrNumber, chromSel, chrStart_locus, chrEnd_locus, true_tuple_limit, hicCellTypeToExclude, hicCellTypeToConsider); 
+	  sql_query_true_interactions = dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(chrNumber, chromSel, chrStart_locus, chrEnd_locus, true_tuple_limit, hicCellTypeToExclude1, hicCellTypeToExclude2, hicCellTypeToExclude3, hicCellTypeToExclude4, hicCellTypeToConsider1, hicCellTypeToConsider2, hicCellTypeToConsider3, hicCellTypeToConsider4); 
 	end
-	
--- 	print("\t\n\nsql_query_true_interactions: \n"..sql_query_true_interactions.."\n\n"); 
--- 	io.flush();	
--- 	os.exit();
-	
 
 	-- retrieve a cursor
-	local cur = assert (con:execute(string.format([[%s]], sql_query_true_interactions)));	  
+	local cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_true_interactions)));	  
 
 	-- print all rows, the rows will be indexed by field names
 	local row = cur:fetch ({}, "a");
 	-- print(string.format("first_chrname-first_chrstart-first_chrend\tsecond_chrname-second_chrstart-second_chrend\n"))
 	
-	if dnaseExcludeColumn>=1 and dnaseExcludeColumn <=thisCellTypeNumber then
-	  thisCellTypeNumber = thisCellTypeNumber -1
+	if dnaseExcludeColumn>=1 and dnaseExcludeColumn <=numberOfCellTypes then
+	  numberOfCellTypes = numberOfCellTypes -1
 	end
-	print("database_management.lua: thisCellTypeNumber = "..thisCellTypeNumber)
+	print("database_management.lua: numberOfCellTypes = "..numberOfCellTypes)
 	
         first_profile_initial = 4
-	first_profile_finish = thisCellTypeNumber+3 
-	second_profile_initial = thisCellTypeNumber+4
-	second_profile_finish = (thisCellTypeNumber*2)+3
-	last_index = 4+(thisCellTypeNumber*2);
+	first_profile_finish = numberOfCellTypes+3 
+	second_profile_initial = numberOfCellTypes+4
+	second_profile_finish = (numberOfCellTypes*2)+3
+	last_index = 4+(numberOfCellTypes*2);
 
 	local dnaseDataTableTrue = {}
 	i = 1;
@@ -1236,15 +1488,9 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	while row do	
 	  
 	  if i%1000==0 then io.write("(i="..comma_value(i)..") "); io.flush(); end
-
--- 	  local tempRate = i*100/true_tuple_limit
--- 	  if (round(tempRate,2)%10==0) then 
--- 	    io.write(tempRate.."% "); 
--- 	    io.flush(); 
--- 	  end
 	  
 	  local targetValue = 1
-	  dnaseDataTableTrue[i] = sqlRowRetrieverCommand(row, dataSource, targetValue, first_profile_initial, second_profile_finish, dnaseExcludeColumn, dnaseExcludeColumnName, thisCellTypeNumber)
+	  dnaseDataTableTrue[i] = sqlRowRetrieverCommand(row, dataSource, targetValue, first_profile_initial, second_profile_finish, dnaseExcludeColumn, dnaseExcludeColumnName, numberOfCellTypes)
 	  
 	  -- WE DO NOT SELECT "row.source"
 	  row = cur:fetch(row, "a");
@@ -1260,17 +1506,10 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	 local length = -1
 	 local lengthTrues = -1
 	  
-	if #dnaseDataTableTrue>0 then
-	
+	if #dnaseDataTableTrue>0 then	
 	  length = #dnaseDataTableTrue;
 	  lengthTrues = #dnaseDataTableTrue;
-	  width = (#dnaseDataTableTrue[1])[1];
-
-	  --print('length = #dnaseDataTableTrue '..comma_value(length));
-	  -- print('width = (#dnaseDataTableTrue[1])[1] '..width);
-
-	  -- if tuple_limit ~= -1 then true_tuple_limit = lengthTrues end
-	
+	  width = (#dnaseDataTableTrue[1])[1];	
 	else	
 	  length = 0
 	  lengthTrues = 0	
@@ -1305,15 +1544,11 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	elseif dataSource=="Miriam2014" then 
 	  sql_query_false_interactions = dbMiriam2014profiles_on_Miriam2014falseinteractions_query(chrNumber, chromSel, chrStart_locus, chrEnd_locus, locus_position_limit, lengthTrues, balancedFlag, false_tuple_limit);
 	elseif dataSource=="Thurman_Miriam" then
-	  sql_query_false_interactions = dbThurman2012profiles_on_Miriam2014falseinteractions_query(chrNumber, chromSel, chrStart_locus, chrEnd_locus, locus_position_limit, lengthTrues, balancedFlag, false_tuple_limit, hicCellTypeToExclude, hicCellTypeToConsider);
+	  sql_query_false_interactions = dbThurman2012profiles_on_Miriam2014falseinteractions_query_4_cell_types(chrNumber, chromSel, chrStart_locus, chrEnd_locus, locus_position_limit, lengthTrues, balancedFlag, false_tuple_limit, hicCellTypeToExclude1, hicCellTypeToExclude2, hicCellTypeToExclude3, hicCellTypeToExclude4, hicCellTypeToConsider1, hicCellTypeToConsider2, hicCellTypeToConsider3, hicCellTypeToConsider4);
 	end
-	
-
---	print("\t\nsql_query_false_interactions=\t"..sql_query_false_interactions);
---	os.exit();
 		  
 	-- retrieve a cursor
-	cur = assert (con:execute(string.format([[%s]], sql_query_false_interactions)));
+	cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query_false_interactions)));
 		 
 	-- print all rows, the rows will be indexed by field names
 	row = cur:fetch ({}, "a");
@@ -1327,14 +1562,9 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	while row do	   
 
 	  if i%1000==0 then io.write("(i="..comma_value(i)..") "); io.flush(); end
-	  
--- 	  local tempRate = i*100/false_tuple_limit
--- 	  if (round(tempRate,2)%10==0) then 
--- 	    io.write(tempRate.."% "); io.flush(); 	  
--- 	  end
 	   
 	   local targetValue = 0
-	   dnaseDataTableFalse[i] = sqlRowRetrieverCommand(row, dataSource, targetValue, first_profile_initial, second_profile_finish, dnaseExcludeColumn, dnaseExcludeColumnName, thisCellTypeNumber)	   
+	   dnaseDataTableFalse[i] = sqlRowRetrieverCommand(row, dataSource, targetValue, first_profile_initial, second_profile_finish, dnaseExcludeColumn, dnaseExcludeColumnName, numberOfCellTypes)	   
 	    -- WE DO NOT SELECT "row.source"
 	 	   
 	   row = cur:fetch(row, "a");
@@ -1344,22 +1574,10 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	 
 	-- close everything
 	cur:close(); 
-	con:close();
-	env:close();
-	 
-         --printTime(timeSecondSqlExecution, "second Sql execution duration");
-	 
+	-- closeGlobalDbConnection()	 
 	 
 	print('length = #dnaseDataTableFalse '..comma_value(#dnaseDataTableFalse));
-	-- print('width = (#dnaseDataTableFalse[1])[1] '..(#dnaseDataTableFalse[1])[1]);
-	
-	
--- 	print("\n\n\tsql_query_true_interactions: \n"..sql_query_true_interactions); io.flush();
---   	print("\n\n\ttsql_query_false_interactions: \n"..sql_query_false_interactions); io.flush();		
---  	os.exit();
-
 	printTime(timeStart, "PostgreSQL data reading")
-	
 	
 	io.write("\n");
 	
@@ -1540,61 +1758,6 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	  end
 	end
 	
-	--io.write("(#dnaseDataTable[9940])[1] "..(#dnaseDataTable[9940])[1]); io.flush();
--- 	  if  #dnaseDataTableTrue==#dnaseDataTableFalse then
--- 
--- 	    i=1;
--- 	    j=1;
--- 	    for u=1,(#dnaseDataTableTrue+#dnaseDataTableFalse) do
--- 	      dnaseDataTable[u] = {};
--- 		    if u%2==0 then
--- 			    dnaseDataTable[u] = (dnaseDataTableTrue[i]);			
--- 			    i = i + 1;
--- 		    else
--- 			    dnaseDataTable[u] = (dnaseDataTableFalse[j]);
--- 			    j = j + 1;
--- 		    end
--- 	    end
--- 	  else --if  #dnaseDataTableTrue~=#dnaseDataTableFalse then
--- 	    i=1;
--- 	    j=1;
--- 	    for u=1,(#dnaseDataTableTrue+#dnaseDataTableFalse) do	      
--- 	      dnaseDataTable[u] = {};
--- 	      if u<=(#dnaseDataTableTrue)*2 then
--- 		    if u%2==0 then
--- 			    dnaseDataTable[u] = (dnaseDataTableTrue[i]);			
--- 			    i = i + 1;
--- 		    else
--- 			    dnaseDataTable[u] = (dnaseDataTableFalse[j]);
--- 			    j = j + 1;
--- 		    end	    
--- 	      else -- u>(#dnaseDataTableTrue)*2+1 u <(#dnaseDataTableTrue+#dnaseDataTableFalse)
--- 	      
--- 			    dnaseDataTable[u] = (dnaseDataTableFalse[j]);
--- 			    j = j + 1;
--- 	      end
--- 	  end
--- 	end
-	
---[[	 
-	for i=1,#dnaseDataTable do
-	   -- io.write('\n dnaseDataTable['..i..']: ');
-	   io.write('['..i..'] = ');
-	  for j=4,width do
-	  	io.write((dnaseDataTable[i][j]/generalMaxValue)..' '); io:flush();
-	  end
-	  io.write(' \n');
-	end
-	io.write("\n");]]
-	
--- 	for i=1,#dnaseDataTable do
--- 	  io.write(' '..dnaseDataTable[i][(#dnaseDataTable[1])[1]]); io:flush();
--- 	end
-	
-	
-     -- os.exit();
-	
-      -- sys.sleep(3);
       print("\n#dnaseDataTable = "..comma_value(#dnaseDataTable));
       print("\n#dnaseDataTable_length = ".. comma_value(dnaseDataTable_length));      
       if #dnaseDataTable~=dnaseDataTable_length then print("Dimension error because of #dnaseDataTable~=dnaseDataTable_length.\n The program will stop."); os.exit(); end
@@ -1638,19 +1801,7 @@ function readDataThroughPostgreSQL(chromSel, tuple_limit, locus_position_limit, 
 	end
 	
 
-	-- load driver
-	local driver = require "luasql.postgres";
-	-- create environment object
-	env = assert (driver.postgres());
-	-- connect to data source
-	-- con = assert (env:connect("davide", "dchicco", "davide", "192.168.2.12"));
-	con = assert(env:connect(DB_NAME, DB_USER, DB_PWD, DB_ADDRESS));
-
-
-
 	-- TRUE INTERACTIONS in the dnaseDataTableTrue 
-
-
 
 	sql_query = "\nSELECT ".. chrNumber  .." AS name, cr1.id_region AS cr1_id_region, cr2.id_region AS cr2_id_region, cr1.a549_ds14289 AS cr1_a549_ds14289,  cr1.ag10803_ds12374 AS cr1_ag10803_ds12374,  cr1.aoaf_ds13513 AS cr1_aoaf_ds13513,  cr1.cd14_ds17215 AS cr1_cd14_ds17215,  cr1.cd19_ds17186 AS cr1_cd19_ds17186,  cr1.cd20_ds18208 AS cr1_cd20_ds18208,  cr1.cd34_ds12274 AS cr1_cd34_ds12274,  cr1.cd3_cordblood_ds17706 AS cr1_cd3_cordblood_ds17706,  cr1.cd3_ds17198 AS cr1_cd3_ds17198,  cr1.cd4_ds17212 AS cr1_cd4_ds17212,  cr1.cd4pos_n_ds14108 AS cr1_cd4pos_n_ds14108,  cr1.cd56_ds17189 AS cr1_cd56_ds17189,  cr1.cd8_ds17203 AS cr1_cd8_ds17203,  cr1.fbrain_ds11872 AS cr1_fbrain_ds11872,  cr1.fheart_ds12531 AS cr1_fheart_ds12531,  cr1.fintestine_lg_ds17313 AS cr1_fintestine_lg_ds17313,  cr1.fkidney_ds20786 AS cr1_fkidney_ds20786,  cr1.flung_ds14724 AS cr1_flung_ds14724,  cr1.fmuscle_leg_ds20239 AS cr1_fmuscle_leg_ds20239,  cr1.fplacenta_ds20346 AS cr1_fplacenta_ds20346,  cr1.fskin_fibro_leg_r_quad_ds19943 AS cr1_fskin_fibro_leg_r_quad_ds19943,  cr1.fspinal_cord_ds20351 AS cr1_fspinal_cord_ds20351,  cr1.fstomach_ds17878 AS cr1_fstomach_ds17878,  cr1.fthymus_ds20341 AS cr1_fthymus_ds20341,  cr1.gm06990_ds7748 AS cr1_gm06990_ds7748,  cr1.gm12865_ds12436 AS cr1_gm12865_ds12436,  cr1.haepic_ds12663 AS cr1_haepic_ds12663,  cr1.hah_ds15192 AS cr1_hah_ds15192,  cr1.hasp_ds14790 AS cr1_hasp_ds14790,  cr1.hcfaa_ds13480 AS cr1_hcfaa_ds13480,  cr1.hcf_ds12501 AS cr1_hcf_ds12501,  cr1.hcm_ds12599 AS cr1_hcm_ds12599,  cr1.hcpepic_ds12447 AS cr1_hcpepic_ds12447,  cr1.heepic_ds12763 AS cr1_heepic_ds12763,  cr1.hepg2_ds7764 AS cr1_hepg2_ds7764,  cr1.hesct0_ds11909 AS cr1_hesct0_ds11909,  cr1.hff_ds15115 AS cr1_hff_ds15115,  cr1.hgf_ds11752 AS cr1_hgf_ds11752,  cr1.hipepic_ds12684 AS cr1_hipepic_ds12684,  cr1.hmf_ds13368 AS cr1_hmf_ds13368,  cr1.hmvec_dblad_ds13337 AS cr1_hmvec_dblad_ds13337,  cr1.hmvec_dblneo_ds13242 AS cr1_hmvec_dblneo_ds13242,  cr1.hmvec_dlyneo_ds13150 AS cr1_hmvec_dlyneo_ds13150,  cr1.hmvec_lbl_ds13372 AS cr1_hmvec_lbl_ds13372,  cr1.hmvec_lly_ds13185 AS cr1_hmvec_lly_ds13185,  cr1.hpaf_ds13411 AS cr1_hpaf_ds13411,  cr1.hpdlf_ds13573 AS cr1_hpdlf_ds13573,  cr1.hpf_ds13390 AS cr1_hpf_ds13390,  cr1.hrce_ds10666 AS cr1_hrce_ds10666,  cr1.hsmm_ds14426 AS cr1_hsmm_ds14426,  cr1.hth17_ds11039 AS cr1_hth17_ds11039,  cr1.hth1_ds7840 AS cr1_hth1_ds7840,  cr1.hth2ds17597 AS cr1_hth2ds17597,  cr1.htr_ds14702 AS cr1_htr_ds14702,  cr1.huvec_ds10060 AS cr1_huvec_ds10060,  cr1.hvmf_ds13981 AS cr1_hvmf_ds13981,  cr1.imr90_ds13219 AS cr1_imr90_ds13219,  cr1.ips_19_11_ds15153 AS cr1_ips_19_11_ds15153,  cr1.ith1_ds18018 AS cr1_ith1_ds18018,  cr1.ith2_ds17603 AS cr1_ith2_ds17603,  cr1.k562_ds9767 AS cr1_k562_ds9767,  cr1.lhcn_m2_ds20548 AS cr1_lhcn_m2_ds20548,  cr1.m059j_ds20493 AS cr1_m059j_ds20493,  cr1.mesendoderm_ds19310 AS cr1_mesendoderm_ds19310,  cr1.msc_ds21042 AS cr1_msc_ds21042,  cr1.nb4_ds12543 AS cr1_nb4_ds12543,  cr1.nha_ds12800 AS cr1_nha_ds12800,  cr1.nhdf_ad_ds12863 AS cr1_nhdf_ad_ds12863,  cr1.nhdf_neo_ds11923 AS cr1_nhdf_neo_ds11923,  cr1.nhlf_ds12829 AS cr1_nhlf_ds12829,  cr1.psoas_muscle_ds20325 AS cr1_psoas_muscle_ds20325,  cr1.rpmi_7951_ds20909 AS cr1_rpmi_7951_ds20909,  cr1.saec_ds10518 AS cr1_saec_ds10518,  cr1.skin_fibroblasts_ds18224 AS cr1_skin_fibroblasts_ds18224,  cr1.skin_keratinocytes_ds18692 AS cr1_skin_keratinocytes_ds18692,  cr1.skin_melanocytes_ds18590 AS cr1_skin_melanocytes_ds18590,  cr1.skmc_ds11949 AS cr1_skmc_ds11949,  cr1.sknsh_ds8482 AS cr1_sknsh_ds8482,  cr1.small_bowel_mucosa_ds20770 AS cr1_small_bowel_mucosa_ds20770,  cr1.t_47d_ds19794 AS cr1_t_47d_ds19794,  cr1.trophoblast_ds19317 AS cr1_trophoblast_ds19317,  cr1.vhmec_ds18406 AS cr1_vhmec_ds18406,  cr2.a549_ds14289 AS cr2_a549_ds14289,  cr2.ag10803_ds12374 AS cr2_ag10803_ds12374,  cr2.aoaf_ds13513 AS cr2_aoaf_ds13513,  cr2.cd14_ds17215 AS cr2_cd14_ds17215,  cr2.cd19_ds17186 AS cr2_cd19_ds17186,  cr2.cd20_ds18208 AS cr2_cd20_ds18208,  cr2.cd34_ds12274 AS cr2_cd34_ds12274,  cr2.cd3_cordblood_ds17706 AS cr2_cd3_cordblood_ds17706,  cr2.cd3_ds17198 AS ";
 	
@@ -1678,7 +1829,7 @@ function readDataThroughPostgreSQL(chromSel, tuple_limit, locus_position_limit, 
 	-- print("\tsql_query: \n"..sql_query); io.flush();
 
 	-- retrieve a cursor
-	cur = assert (con:execute(string.format([[%s]], sql_query)));
+	cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query)));
 	  
 	-- print all rows, the rows will be indexed by field names
 	row = cur:fetch ({}, "a");
@@ -1760,7 +1911,7 @@ if flagNoLimits==true then tuple_limit = length end
 	--   print("\tsql_query: \n"..sql_query);  io.flush();
 	 
 	-- retrieve a cursor
-	 cur = assert (con:execute(string.format([[%s]], sql_query)));
+	 cur = assert (openGlobalDbConnection():execute(string.format([[%s]], sql_query)));
 	  
 	 
 	-- print all rows, the rows will be indexed by field names
@@ -1854,8 +2005,7 @@ if flagNoLimits==true then tuple_limit = length end
 
 	-- close everything
 	cur:close(); -- already closed because all the result set was consumed
-	con:close();
-	env:close();
+	-- closeGlobalDbConnection()
 	
 	printTime(timeStart, "PostgreSQL data reading")
 
