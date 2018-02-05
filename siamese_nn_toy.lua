@@ -45,6 +45,8 @@ PRINT_NOT_REG_CELL_TYPE_ONCE = true
 SCORE_UNDEF = -2
 HIGHLIGHT_NEURON_WEIGHT_1ST_CELL_TYPE = false
 
+NEW_ARCHITECTURE = true -- new architecture with the doubling of the neurons
+
 require 'optim'
 -- require '../../torch/NEW_CosineDistance.lua'
 require './lib/NEW_CosineDistance.lua'
@@ -868,17 +870,15 @@ function siameseNeuralNetwork_training(first_datasetTrain, second_datasetTrain, 
   
   local completionRate = 0
   local loopIterations = 1
--- ######## Line too long (88 chars) ######## :
   local trainIndexVect = {}; for i=1, #first_datasetTrain do trainIndexVect[i] = i;  end
   
   print("#trainIndexVect = "..comma_value(#trainIndexVect));
 
   local permutedTrainIndexVect = {};
   if PERMUTATION_TRAIN == true then
--- ######## Line too long (84 chars) ######## :
-  permutedTrainIndexVect = permute(trainIndexVect, #trainIndexVect, #trainIndexVect)
+    permutedTrainIndexVect = permute(trainIndexVect, #trainIndexVect, #trainIndexVect)
   else 
-  permutedTrainIndexVect = trainIndexVect
+    permutedTrainIndexVect = trainIndexVect
   end
 
   local printPercCount = 0;
@@ -1788,6 +1788,8 @@ if hicCellTypeTrainingSet4~="-1" and hicCellTypeTrainingSet4~=-1 then
   trainingSetCellTypeColumnNumber4, trainingSetCellTypeColumnName4 = retrieveCellTypeColumnNameAndNumber(hicCellTypeTrainingSet4)
 end
 
+zero_array = {}
+for i=1,CELL_TYPE_NUMBER do zero_array[i]=0 end
 
 
 -- % -- % -- % -- % -- % -- % -- End of the input reading -- % -- % -- % -- % -- % 
@@ -1847,7 +1849,6 @@ local uniformDistribution = true;
 local unbal_data_read_output = readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position_limit, balancedFlag, chrStart_locus, chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, balancedFalsePerc, uniformDistribution, dnaseExcludeColumn, hicCellTypeValidSet1, hicCellTypeValidSet2, hicCellTypeValidSet3, hicCellTypeValidSet4, hicCellTypeTrainingSet1, hicCellTypeTrainingSet2, hicCellTypeTrainingSet3, hicCellTypeTrainingSet4)
 
 
-
 local balancedDatasetSize = unbal_data_read_output[1];    
 -- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
 dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
@@ -1855,13 +1856,18 @@ dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced 
 dnaseDataTable_only_IDs_training = unbal_data_read_output[8];
   
  if balancedDatasetSize==0 then
--- ######## Line too long (82 chars) ######## :
   print("No true interactions in the training set: the program is going to stop");
   os.exit();
  end
-  
-dataset_firstChromRegion = unbal_data_read_output[3];
-dataset_secondChromRegion = unbal_data_read_output[4];
+
+if NEW_ARCHITECTURE == false then
+  dataset_firstChromRegion = unbal_data_read_output[3];
+  dataset_secondChromRegion = unbal_data_read_output[4];
+else
+  dataset_firstChromRegion = unbal_data_read_output[9];
+  dataset_secondChromRegion = unbal_data_read_output[10];
+end
+
 targetVector = unbal_data_read_output[5];
 
 end --(endif execution ~= "JUST-TESTING")
@@ -1898,10 +1904,17 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZ
   local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, hicCellTypeTrainingSet1, hicCellTypeTrainingSet2, hicCellTypeTrainingSet3, hicCellTypeTrainingSet4, hicCellTypeValidSet1, hicCellTypeValidSet2, hicCellTypeValidSet3, hicCellTypeValidSet4)
   
   val_dnaseDataTable = val_dataset_output[2]; 
-  val_dataset_firstChromRegion = val_dataset_output[3];
-  val_dataset_secondChromRegion = val_dataset_output[4];
-  val_targetVector = val_dataset_output[5];  
   
+  if NEW_ARCHITECTURE == false then
+    val_dataset_firstChromRegion = val_dataset_output[3];
+    val_dataset_secondChromRegion = val_dataset_output[4];
+  else
+    val_dataset_firstChromRegion = val_dataset_output[9];
+    val_dataset_secondChromRegion = val_dataset_output[10];
+  end
+  
+  
+  val_targetVector = val_dataset_output[5];    
   dnaseDataTable_only_IDs_val = val_dataset_output[8];
    
 
@@ -2006,16 +2019,14 @@ if (hicCellTypeValidSet1~=-1 and hicCellTypeValidSet1~="-1") or execution=="JUST
   NO_INTERSECTION_BETWEEN_SETS = false
 end
 
---	REMOVING DATA FROM THE VALIDATION SET
+-- REMOVING DATA FROM THE VALIDATION SET
 if NO_INTERSECTION_BETWEEN_SETS==true then
 
  -- Remove the test set elements from the training set
  print("Remove the test set elements from the training set");
  print("before removal:")
  print("BEFORE #val_dnaseDataTable = "..comma_value(#val_dnaseDataTable))
--- ######## Line too long (93 chars) ######## :
  print("BEFORE #val_dataset_firstChromRegion = "..comma_value(#val_dataset_firstChromRegion))
--- ######## Line too long (95 chars) ######## :
  print("BEFORE #val_dataset_secondChromRegion = "..comma_value(#val_dataset_secondChromRegion))
  print("BEFORE #val_targetVector = "..comma_value(#val_targetVector))
 
@@ -2029,7 +2040,6 @@ if NO_INTERSECTION_BETWEEN_SETS==true then
    io.write(kRate.."% "); io.flush(); 
   end
   
--- ######## Line too long (89 chars) ######## :
   local output_contains = chromRegionTableContains(val_dnaseDataTable, dnaseDataTable[k])
   local label = output_contains[1]
   --print("label = "..tostring(label))
@@ -2052,14 +2062,11 @@ if NO_INTERSECTION_BETWEEN_SETS==true then
  end
  
  
--- ######## Line too long (116 chars) ######## :
 printTime(noIntersectiontimeStart, " removal of the elements which were present both in training set and test set");
 
 print("after removal:")
 print("AFTER #val_dnaseDataTable = "..comma_value(#val_dnaseDataTable))
--- ######## Line too long (91 chars) ######## :
 print("AFTER #val_dataset_firstChromRegion = "..comma_value(#val_dataset_firstChromRegion))
--- ######## Line too long (93 chars) ######## :
 print("AFTER #val_dataset_secondChromRegion = "..comma_value(#val_dataset_secondChromRegion))
 print("AFTER #val_targetVector = "..comma_value(#val_targetVector))
   
@@ -2067,9 +2074,7 @@ end
 
 
 print("\nAFTER #dnaseDataTable = "..comma_value(#dnaseDataTable))
--- ######## Line too long (83 chars) ######## :
 print("AFTER #dataset_firstChromRegion = "..comma_value(#dataset_firstChromRegion))
--- ######## Line too long (85 chars) ######## :
 print("AFTER #dataset_secondChromRegion = "..comma_value(#dataset_secondChromRegion))
 print("AFTER #targetVector = "..comma_value(#targetVector))
 
@@ -2162,7 +2167,12 @@ for hiddenLayers=1,maxHiddenLayers do
   
   hiddenUnits = v;
 
-  input_number = CELL_TYPE_NUMBER
+  if NEW_ARCHITECTURE == false then
+     input_number = CELL_TYPE_NUMBER
+  else
+     input_number = CELL_TYPE_NUMBER*2
+  end
+  
   output_layer_number = CELL_TYPE_NUMBER
   
   io.write(" dropOutFlag = "..tostring(dropOutFlag));
@@ -2170,61 +2180,53 @@ for hiddenLayers=1,maxHiddenLayers do
   io.write(" hiddenLayers = "..hiddenLayers.."\n");
   io.flush();
   
--- ######## Line too long (162 chars) ######## :
   local architectureLabel = tostring("_"..regionLabel.."_tuples="..tuple_limit.."_hiddenUnits="..tostring(hiddenUnits).."_hiddenLayers="..tostring(hiddenLayers));
 
--- ######## Line too long (126 chars) ######## :
   local initialPerceptron = architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag);  
   
--- ######## Line too long (133 chars) ######## :
   if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL-DOUBLE-INPUT" then		
 
-  local first_datasetTrain = dataset_firstChromRegion
-  local second_datasetTrain = dataset_secondChromRegion
-  local targetDatasetTrain = targetVector
+    local first_datasetTrain = dataset_firstChromRegion
+    local second_datasetTrain = dataset_secondChromRegion
+    local targetDatasetTrain = targetVector
 
-  local first_datasetTest = val_dataset_firstChromRegion
-  local second_datasetTest = val_dataset_secondChromRegion
-  local targetDatasetTest = val_targetVector
-  
--- ######## Line too long (236 chars) ######## :
-  local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
-  
-  vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
-  vectorMCC[#vectorMCC+1] = applicationOutput[3];	
-  
-  local currentMCC = applicationOutput[3]
-  local currentAccuracy = applicationOutput[1]
-  io.write("currentMCC = "..signedValueFunction(round(currentMCC,3)));
-  io.write(" currentAccuracy = "..round(currentAccuracy,3));
-  io.write(" hiddenUnits = "..hiddenUnits);
-  io.write(" hiddenLayers = "..hiddenLayers.."\n");
-  io.flush();
-  
-  -- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
-  printVector(vectorMCC, "PARTIAL vectorMCC");
-  
--- ######## Line too long (88 chars) ######## :
-  local stopCondition = continueOrStopCheck(applicationOutput[1], applicationOutput[3]);
-  
-  if stopCondition==true then break; end
+    local first_datasetTest = val_dataset_firstChromRegion
+    local second_datasetTest = val_dataset_secondChromRegion
+    local targetDatasetTest = val_targetVector
+    
+
+    local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
+    
+    vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1];
+    vectorMCC[#vectorMCC+1] = applicationOutput[3];	
+    
+    local currentMCC = applicationOutput[3]
+    local currentAccuracy = applicationOutput[1]
+    io.write("currentMCC = "..signedValueFunction(round(currentMCC,3)));
+    io.write(" currentAccuracy = "..round(currentAccuracy,3));
+    io.write(" hiddenUnits = "..hiddenUnits);
+    io.write(" hiddenLayers = "..hiddenLayers.."\n");
+    io.flush();
+    
+    -- printVector(vectorAccuracy, "PARTIAL vectorAccuracy");
+    printVector(vectorMCC, "PARTIAL vectorMCC");
+    
+  -- ######## Line too long (88 chars) ######## :
+    local stopCondition = continueOrStopCheck(applicationOutput[1], applicationOutput[3]);
+    
+    if stopCondition==true then break; end
 
  elseif execution == "OPTIMIZATION-TRAINING-HELD-OUT" then		
 
--- ######## Line too long (84 chars) ######## :
+
   local first_datasetTrain = subrange(dataset_firstChromRegion, 1, TRAINING_SAMPLES)
--- ######## Line too long (86 chars) ######## :
   local second_datasetTrain = subrange(dataset_secondChromRegion, 1, TRAINING_SAMPLES)
   local targetDatasetTrain = subrange(targetVector, 1, TRAINING_SAMPLES)
 
--- ######## Line too long (93 chars) ######## :
   local first_datasetTest = subrange(dataset_firstChromRegion, TRAINING_SAMPLES+1, DATA_SIZE)
--- ######## Line too long (95 chars) ######## :
   local second_datasetTest = subrange(dataset_secondChromRegion, TRAINING_SAMPLES+1, DATA_SIZE)
--- ######## Line too long (81 chars) ######## :
   local targetDatasetTest = subrange(targetVector, TRAINING_SAMPLES+1, DATA_SIZE)
   
--- ######## Line too long (235 chars) ######## :
   local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile)
   
   vectorAccuracy[#vectorAccuracy+1] = applicationOutput[1]
@@ -2234,12 +2236,10 @@ for hiddenLayers=1,maxHiddenLayers do
   
   print("applicationOutput[3] = "..applicationOutput[3])
   
--- ######## Line too long (87 chars) ######## :
   local stopCondition = continueOrStopCheck(applicationOutput[1], applicationOutput[3])
 
   if stopCondition==true then break; end  
   
--- ######## Line too long (136 chars) ######## :
  elseif execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION" or execution == "OPTIMIZATION-TRAINING-CROSS-VALIDATION-DOUBLE-INPUT" then
   
   local globalPredictionVector = {}
@@ -2282,8 +2282,13 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
   hiddenUnits = 600 -- USUALLY 100
   hiddenLayers = 1 -- USUALLY 1
 
-  local input_number = CELL_TYPE_NUMBER
-  local output_layer_number = CELL_TYPE_NUMBER
+  if NEW_ARCHITECTURE == false then
+     input_number = CELL_TYPE_NUMBER
+  else
+     input_number = CELL_TYPE_NUMBER*2
+  end
+  
+  output_layer_number = CELL_TYPE_NUMBER
   
   io.write(" dropOutFlag = "..tostring(dropOutFlag));
   io.write(" hiddenUnits = "..hiddenUnits);
@@ -2293,7 +2298,6 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
 -- ######## Line too long (162 chars) ######## :
   local architectureLabel = tostring("_"..regionLabel.."_tuples="..tuple_limit.."_hiddenUnits="..tostring(hiddenUnits).."_hiddenLayers="..tostring(hiddenLayers));
 
--- ######## Line too long (126 chars) ######## :
   local initialPerceptron = architecture_creator(input_number, hiddenUnits, hiddenLayers, output_layer_number, dropOutFlag);  
   
   local first_datasetTrain = dataset_firstChromRegion
@@ -2307,7 +2311,6 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
   
   local timeSiameseNeuralNetwork_application = os.time();
   
--- ######## Line too long (236 chars) ######## :
   local applicationOutput = siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrain, targetDatasetTrain, first_datasetTest, second_datasetTest, targetDatasetTest, initialPerceptron, architectureLabel, trainedModelFile);
   
   local currentMCC = applicationOutput[3]

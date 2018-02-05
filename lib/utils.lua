@@ -7,6 +7,28 @@
 MORDOR_QUEUE = "hoffmangroup"
 
 
+-- Function to concat a tensor and an array by position (a1, b1, a2, b2, a3, b3, ...)
+function tensorArrayConcatByPos(te,a)
+  local t_merge = {}
+    for i=1,(te:size())[1] do
+        t_merge[#t_merge+1] = te[i]
+	t_merge[#t_merge+1] = a[i]
+	i = i + 1
+    end
+    return torch.Tensor(t_merge)
+end
+
+-- Function to concat two arrays by position (a1, b1, a2, b2, a3, b3, ...)
+function arrayConcatByPos(t1,t2)
+  local t_merge = {}
+    for i=1,#t1 do
+        t_merge[#t_merge+1] = t1[i]
+	t_merge[#t_merge+1] = t2[i]
+	i = i + 1
+    end
+    return t_merge
+end
+
 -- Function tableCopy
 function tableCopy(orig)
     local orig_type = type(orig)

@@ -10,6 +10,26 @@ MAX_MEAN = 200
 PRINT_MANIPULATION = true
 PRINT_AVERAGES = false
 
+IMR90_COL_INDEX = 57
+HUVEC_COL_INDEX = 55
+K562_COL_INDEX = 61
+GM12878_COL_INDEX = 26
+
+
+-- Function that reads a cell type and returns the index of the neuron in the neural network
+function retrieveNeuronIndexFromCellType(cell_type)
+  
+  local output_var = ""
+  
+  if cell_type=="IMR90" then output_var=IMR90_COL_INDEX end
+  if cell_type=="HUVEC" then output_var=HUVEC_COL_INDEX end
+  if cell_type=="k562" then output_var=K562_COL_INDEX end
+  if cell_type=="GM12878" then output_var=GM12878_COL_INDEX end
+  
+  return output_var
+  
+end
+
 printOnce = true
 
 -- DATABASE CONNECTION global connection tools
@@ -1027,7 +1047,7 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(c
       " JOIN chromregionprofiles AS crp1b  ON cr1b.id_region=crp1b.id_region  "..
       " JOIN chromregionprofiles AS crp2b  ON cr2b.id_region=crp2b.id_region  "..
       " JOIN chromosomes AS c_bis ON (c_bis.id_chr=cr1b.id_chr AND c_bis.id_chr=cr2b.id_chr) "..
-      " WHERE c_bis.name='"..chromSel.. "' AND  "..
+      " WHERE c_bis.id_chr=cr1.id_chr AND  "..
       " celltype = '"..hicCellTypeToConsider2.."'  AND  "..
       " ((crp1.id_region = cr1b.id_region AND "..
       " crp2.id_region = cr2b.id_region) OR "..
@@ -1047,7 +1067,7 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(c
 	" JOIN chromregionprofiles AS crp1c  ON cr1c.id_region=crp1c.id_region  ".. 
 	" JOIN chromregionprofiles AS crp2c  ON cr2c.id_region=crp2c.id_region   "..
 	" JOIN chromosomes AS c_ter ON (c_ter.id_chr=cr1c.id_chr AND c_ter.id_chr=cr2c.id_chr)  "..
-	" WHERE c_ter.name='"..chromSel.. "' AND   "..
+	" WHERE c_ter.id_chr=cr1.id_chr AND   "..
 	" celltype = '"..hicCellTypeToConsider3.."'  AND   "..
 	" ((crp1.id_region = cr1c.id_region AND "..
 	" crp2.id_region = cr2c.id_region) OR  "..
@@ -1068,7 +1088,7 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(c
 	" JOIN chromregionprofiles AS crp2d  ON cr2d.id_region=crp2d.id_region   "..
 	" JOIN chromosomes AS c_quater ON (c_quater.id_chr=cr1d.id_chr AND  "..
 	" c_quater.id_chr=cr2d.id_chr)  "..
-	" WHERE c_quater.name='"..chromSel.. "' AND   "..
+	" WHERE c_quater.id_chr=cr1.id_chr AND   "..
 	" celltype = '"..hicCellTypeToConsider4.."'  AND   "..
 	" ((crp1.id_region = cr1d.id_region AND "..
 	" crp2.id_region = cr2d.id_region) OR  "..
@@ -1078,36 +1098,36 @@ function dbThurman2012profiles_on_Miriam2014hicinteractions_query_4_cell_types(c
 	" ) "
   end
   
-  -- All the 1,2,3,4 cell type to exclude
-  if hicCellTypeToExclude1~=-1 and hicCellTypeToExclude1~="-1" then
-      sql_query = sql_query .." AND NOT EXISTS ( "..
-      " SELECT 1 "..
-      " FROM hic_interactions_with_labels_and_ids AS hic_inte  "..
-      " JOIN chromregions AS cr1e ON hic_inte.id_region1=cr1e.id_region  "..
-      " JOIN chromregions AS cr2e ON hic_inte.id_region2=cr2e.id_region  "..
-      " JOIN chromregionprofiles AS crp1e  ON cr1e.id_region=crp1e.id_region  "..
-      " JOIN chromregionprofiles AS crp2e  ON cr2e.id_region=crp2e.id_region  "..
-      " JOIN chromosomes AS c_five ON (c_five.id_chr=cr1e.id_chr AND c_five.id_chr=cr2e.id_chr) "..
-      " WHERE c_five.name='"..chromSel.. "' AND  "..
-      " (celltype = '"..hicCellTypeToExclude1.."' OR  "..
-      " celltype = '"..hicCellTypeToExclude2.."' OR  "..
-      " celltype = '"..hicCellTypeToExclude3.."' OR  "..
-      " celltype = '"..hicCellTypeToExclude4.."')  "..
-      " AND ((crp1.id_region = cr1e.id_region AND "..
-      " crp2.id_region = cr2e.id_region) OR "..
-      " (crp2.id_region = cr1e.id_region AND "..
-      " crp1.id_region = cr2e.id_region) ) AND "..
-      " crp1e.id_region <> crp2e.id_region "..
-      " ) "
-  end
+--   -- All the 1,2,3,4 cell type to exclude
+--   if hicCellTypeToExclude1~=-1 and hicCellTypeToExclude1~="-1" then
+--       sql_query = sql_query .." AND NOT EXISTS ( "..
+--       " SELECT 1 "..
+--       " FROM hic_interactions_with_labels_and_ids AS hic_inte  "..
+--       " JOIN chromregions AS cr1e ON hic_inte.id_region1=cr1e.id_region  "..
+--       " JOIN chromregions AS cr2e ON hic_inte.id_region2=cr2e.id_region  "..
+--       " JOIN chromregionprofiles AS crp1e  ON cr1e.id_region=crp1e.id_region  "..
+--       " JOIN chromregionprofiles AS crp2e  ON cr2e.id_region=crp2e.id_region  "..
+--       " JOIN chromosomes AS c_five ON (c_five.id_chr=cr1e.id_chr AND c_five.id_chr=cr2e.id_chr) "..
+--       " WHERE c_five.id_chr=cr1.id_chr AND  "..
+--       " (celltype = '"..hicCellTypeToExclude1.."' OR  "..
+--       " celltype = '"..hicCellTypeToExclude2.."' OR  "..
+--       " celltype = '"..hicCellTypeToExclude3.."' OR  "..
+--       " celltype = '"..hicCellTypeToExclude4.."')  "..
+--       " AND ((crp1.id_region = cr1e.id_region AND "..
+--       " crp2.id_region = cr2e.id_region) OR "..
+--       " (crp2.id_region = cr1e.id_region AND "..
+--       " crp1.id_region = cr2e.id_region) ) AND "..
+--       " crp1e.id_region <> crp2e.id_region "..
+--       " ) "
+--   end
 
   sql_query = sql_query.. " ORDER BY random() ";
   if tuple_limit ~= -1 and tuple_limit ~= "-1" then sql_query = sql_query .. " LIMIT "..tuple_limit; end
 
   sql_query = sql_query .. ";"    
 
- --  print("\n\n\n"..sql_query.."\n\n\n");
- -- os.exit();
+  -- print("\n\n\n"..sql_query.."\n\n\n");
+  -- os.exit();
     
   return sql_query;
   
@@ -1365,8 +1385,11 @@ function dbThurman2012profiles_on_Miriam2014falseinteractions_query_4_cell_types
   if hicCellTypeToConsider4~=-1 and hicCellTypeToConsider4~="-1" then
      sql_query = sql_query .. " OR celltype = '".. hicCellTypeToConsider4 .."' "
   end  
+  if hicCellTypeToConsider1~=-1 and hicCellTypeToConsider1~="-1" then
+     sql_query = sql_query .. " ) "
+  end 
   
-  sql_query = sql_query .. " ) ) )  " ;
+  sql_query = sql_query .. "  ) )  " ;
   
   if chromSel~="chr0" then sql_query = sql_query .. " AND c.name='"..chromSel.. "' "; end 
 
@@ -1428,6 +1451,43 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	if (hicCellTypeToConsider3 ~= "-1" and hicCellTypeToConsider3 ~= -1) then io.write(hicCellTypeToConsider3.."\n"); io.flush(); end
 	if (hicCellTypeToConsider4 ~= "-1" and hicCellTypeToConsider4 ~= -1) then io.write(hicCellTypeToConsider4.."\n"); io.flush(); end
 	io.write("\n")
+	
+      NEW_ARCHITECTURE=true --  TO REMOVE
+      flag_array = {}
+      if NEW_ARCHITECTURE==true then 
+	flag_array = zero_array
+	local cell_type_index1 = -1
+	local cell_type_index2 = -1
+	local cell_type_index3 = -1
+	local cell_type_index4 = -1
+	
+	if (hicCellTypeToConsider1~=-1 and hicCellTypeToConsider1~="-1") then
+	  cell_type_index1=retrieveNeuronIndexFromCellType(hicCellTypeToConsider1) 
+	  print("hicCellTypeToConsider1 = ", hicCellTypeToConsider1)
+	  flag_array[cell_type_index1] = 1.0;
+	end
+	if (hicCellTypeToConsider2~=-1 and hicCellTypeToConsider2~="-1") then
+	  cell_type_index2=retrieveNeuronIndexFromCellType(hicCellTypeToConsider2) 
+	  print("hicCellTypeToConsider2 = ", hicCellTypeToConsider2)
+	  flag_array[cell_type_index2] = 1.0;
+	end
+	if (hicCellTypeToConsider3~=-1 and hicCellTypeToConsider3~="-1") then
+	  cell_type_index3=retrieveNeuronIndexFromCellType(hicCellTypeToConsider3) 
+	  print("hicCellTypeToConsider3 = ", hicCellTypeToConsider3)
+	  flag_array[cell_type_index3] = 1.0;
+	end
+	if (hicCellTypeToConsider4~=-1 and hicCellTypeToConsider4~="-1") then
+	  cell_type_index4=retrieveNeuronIndexFromCellType(hicCellTypeToConsider4) 
+	  print("hicCellTypeToConsider4 = ", hicCellTypeToConsider4)
+	  flag_array[cell_type_index4] = 1.0;
+	end
+      end
+	
+--       print("#flag_array = "..#flag_array)
+--       print("START printVector(flag_array, flag_array)")
+--       printVector(flag_array, "flag_array")
+--       
+--       print("END printVector(flag_array, flag_array)\n")
 	
 	local dnaseExcludeColumnName = "";
 	if dnaseExcludeColumn>=1 and dnaseExcludeColumn<=numberOfCellTypes then
@@ -1597,6 +1657,8 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	
 	local dnaseDataTable_only_IDs = {}
 	
+	local dataset_firstChromRegion_newArchi = {};
+	local dataset_secondChromRegion_newArchi = {};
 
 	-- IF AT LEAST ONE "ONE" IS PRESENT
 	
@@ -1680,13 +1742,13 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	      local secondMean = round(torch.mean(dataset_secondChromRegion[i]),2);
 	      local meanOfMeans = round(((firstMean + secondMean)/2),2)
 	      
-	    if PRINT_AVERAGES then  
-	      io.write("["..i.."] firstChromReg mean = "..firstMean);
-	      io.write(" secondChromReg mean = "..secondMean);
-	      io.write("\t meanOfMeans = "..meanOfMeans);
-	      io.write("\n");
-	      io.flush();
-	    end
+	      if PRINT_AVERAGES then  
+		io.write("["..i.."] firstChromReg mean = "..firstMean);
+		io.write(" secondChromReg mean = "..secondMean);
+		io.write("\t meanOfMeans = "..meanOfMeans);
+		io.write("\n");
+		io.flush();
+	      end
 	      
 
 	      completeTable[i] = {};
@@ -1696,8 +1758,16 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	      dataset[i] = {completeTable[i], targetVector[i]};	     
 	      io.flush();
 	      collectgarbage();
+  
+	      -- print(#(dataset_firstChromRegion[i]))
+	      -- print(#(dataset_secondChromRegion[i]))
 	      
--- 	      -- print("targetVector["..i.."][1] = "..targetVector[i][1]);
+	      -- aaa = dataset_firstChromRegion[i]
+	      
+	      if NEW_ARCHITECTURE == true then
+		dataset_firstChromRegion_newArchi[i] = tensorArrayConcatByPos(dataset_firstChromRegion[i], flag_array)
+		dataset_secondChromRegion_newArchi[i] = tensorArrayConcatByPos(dataset_secondChromRegion[i], flag_array)
+	      end
 	    
 	  end
 	  
@@ -1730,6 +1800,11 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	    end
 	    if torch.max(dataset_secondChromRegion[i]) > generalMaxValue then 
 		generalMaxValue = torch.max(dataset_secondChromRegion[i])
+	    end
+	    
+	    if NEW_ARCHITECTURE == true then
+		dataset_firstChromRegion_newArchi[i] = tensorArrayConcatByPos(dataset_firstChromRegion[i], flag_array)
+		dataset_secondChromRegion_newArchi[i] = tensorArrayConcatByPos(dataset_secondChromRegion[i], flag_array)
 	    end
 	    
 	     if PRINT_AVERAGES then  
@@ -1770,9 +1845,14 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 
       printTime(timeStart, "PostgreSQL data reading and matrix creation")
       print("[vvv readDataThroughPostgreSQL_segment vvv]\n\n\n");
-
+      
       -- return {lengthTrues, dnaseDataTable};	
-	return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs};
+      
+      if NEW_ARCHITECTURE == false then
+      	return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs};
+      else
+	return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs, dataset_firstChromRegion_newArchi, dataset_secondChromRegion_newArchi};
+      end
 end
 
 -- function that reads a matrix of chrom region numbers and ID's, and saves them into an SQL table

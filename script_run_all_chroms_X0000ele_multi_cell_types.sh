@@ -19,12 +19,12 @@ profi_flag="false"
 ## k562 -> 61
 ## GM12878 -> 26 (GM12865)
 
-trainingSetCellTypeName1="IMR90"
-trainingSetCellTypeName2="GM12878"
-trainingSetCellTypeName3="k562"
+trainingSetCellTypeName1="GM12878"
+trainingSetCellTypeName2="HUVEC"
+trainingSetCellTypeName3="IMR90"
 trainingSetCellTypeName4="-1"
 
-hicCellTypeNameValidSet1="HUVEC"
+hicCellTypeNameValidSet1="k562"
 hicCellTypeNameValidSet2="-1"
 hicCellTypeNameValidSet3="-1"
 hicCellTypeNameValidSet4="-1"
@@ -47,12 +47,13 @@ balancedFalsePerc=50
 training_sample_perc=-1
 retrieveFP_flag_ini="false"
 
-folder="../results/"$today"_multi_cell_"${tupleLimit}"elems"/
+folder="../results/"$today"_multi_cell_test_"${hicCellTypeNameValidSet1}"_"${tupleLimit}"elems"/
 mkdir -p $folder
 
 i=1
 for i in $(seq $((${#indexStartVector[@]} - 1)))
 do
+
 
 #   if [ "$i" -ne 1 ] && [ "$i" -ne 2 ]  && [ "$i" -ne 3 ]  && [ "$i" -ne 7 ]  && [ "$i" -ne 12 ]  && [ "$i" -ne 14 ] && [ "$i" -ne 16 ] && [ "$i" -ne 19 ] && [ "$i" -ne 20 ] 
 #   then 
@@ -61,11 +62,12 @@ do
    trainEnd=${indexEndVector[$i-1]}
 
    chrNum="chr"${i}
+   # chrNum="chr0"
    random_number=$(shuf -i1-100000 -n1)
   
-  outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}-yesMinibatch_${tupleLimit}elems_bal_${random_number}rand
+  outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}_test_${hicCellTypeNameValidSet1}_${tupleLimit}elems_bal_${random_number}rand
   
-  modelFile="./models/${chrNum}_trained_model_yesMinibatch_${tupleLimit}elems_bal_${random_number}rand"
+  modelFile="./models/${chrNum}_trained_model_"${hicCellTypeNameValidSet1}"_${tupleLimit}elems_bal_${random_number}rand"
 
 #   qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameValidSet1 $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName1 > $outputFile 2> $outputFile
 
@@ -81,9 +83,24 @@ trainEnd=${indexEndVector[$i-1]}
 
 random_number=$(shuf -i1-100000 -n1)
 
-outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}-yesMinibatch_${tupleLimit}elems_bal_${random_number}rand
+outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}_test_${hicCellTypeNameValidSet1}_${tupleLimit}elems_bal_${random_number}rand
   
-modelFile="./models/${chrNum}_trained_model_yesMinibatch_${tupleLimit}elems_bal_${random_number}rand"
+modelFile="./models/${chrNum}_trained_model_"${hicCellTypeNameValidSet1}"_${tupleLimit}elems_bal_${random_number}rand"
 
 
 qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
+
+# # on all the chromosomes
+# 
+# chrNum="chr0"
+# trainStart=${indexStartVector[$i-1]}
+# trainEnd=${indexEndVector[$i-1]}  
+# 
+# random_number=$(shuf -i1-100000 -n1)
+# 
+# outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}_test_${hicCellTypeNameValidSet1}_${tupleLimit}elems_bal_${random_number}rand
+#   
+# modelFile="./models/${chrNum}_trained_model_"${hicCellTypeNameValidSet1}"_${tupleLimit}elems_bal_${random_number}rand"
+# 
+# 
+# qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
