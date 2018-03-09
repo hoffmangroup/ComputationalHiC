@@ -92,7 +92,9 @@ Edit the first lines of the *database_management.lua* file this way:
 `DB_ADDRESS = "localhost"`
 
 ## Software installation ##
-Clone this repository on your compute.
+Clone this repository on your computer:
+
+`hg clone https://davidechicco@bitbucket.org/hoffmanlab/siamesenn`
 
 ## Execution instructions ##
 Example script:
