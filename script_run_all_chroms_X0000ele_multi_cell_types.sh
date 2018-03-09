@@ -71,7 +71,7 @@ do
 
 #   qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameValidSet1 $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName1 > $outputFile 2> $outputFile
 
-  qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
+  echo -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
 
 
 done
@@ -88,7 +88,7 @@ outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}_test_${hi
 modelFile="./models/${chrNum}_trained_model_"${hicCellTypeNameValidSet1}"_${tupleLimit}elems_bal_${random_number}rand"
 
 
-qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
+echo -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
 
 # # on all the chromosomes
 # 

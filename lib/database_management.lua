@@ -2,9 +2,9 @@
 require "./utils.lua";
 
 DB_NAME = "davide"
-DB_USER = "dchicco"
-DB_PWD = "davide"
-DB_ADDRESS = "192.168.2.12"
+DB_USER = "davide"
+DB_PWD = "test"
+DB_ADDRESS = "localhost"
 DATA_NORMALIZATION = false
 MAX_MEAN = 200
 PRINT_MANIPULATION = true
