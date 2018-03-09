@@ -48,7 +48,7 @@ Here are the instructions to install the project database on your computer.
 Download the database sql file:
 `wget https://www.pmgenomics.ca/hoffmanlab/proj/SiameseNN/davide_dnase_hic_database_2018-03-08.sql`
 
-Create the username `davide`:
+Create the username *davide*:
 
 `sudo su - postgres`
 
