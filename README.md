@@ -70,7 +70,7 @@ Create the username `davide`:
 
 ` exit`
  
- Create the database `davide`:
+ Create the database *davide*:
  
 `psql -d postgres -U davide`
 
@@ -81,11 +81,7 @@ Create the username `davide`:
 Recover the database from the sql backup file:
 `psql davide < davide_dnase_hic_database_2018-03-08.sql`
  
-Conditions to use the database through luasql
-If the following command works:
-psql -d davide -U davide -h localhost
- 
-Edit the first lines of the `database_management.lua` file this way:
+Edit the first lines of the *database_management.lua* file this way:
 
 `DB_NAME = "davide"`
 
@@ -115,4 +111,5 @@ All the code is licensed under the [GNU General Public License, version 2 (GPLv2
 ## Contacts and support ##
 
 SiameseNN was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
-For questions regarding the software, please write to Davide Chicco at [davidechicco@davidechicco.it](mailto:davidechicco@davidechicco.it). For scientific questions, please write to Michael M. Hoffman at [michael.hoffman@utoronto.ca](mailto:michael.hoffman@utoronto.ca)
+
+For questions regarding the software, please write to Davide Chicco at [<davidechicco@davidechicco.it>](mailto:davidechicco@davidechicco.it). For scientific questions, please write to Michael M. Hoffman at [<michael.hoffman@utoronto.ca>](mailto:michael.hoffman@utoronto.ca)
