@@ -23,6 +23,8 @@ To install Torch:
 
 `./install.sh`
 
+`cd ~`
+
 `# On Linux with bash`
 
 `source ~/.bashrc`
@@ -39,6 +41,10 @@ To install PostgreSQL on Linux Ubuntu:
 ## Database installation ##
 Here are the instructions to install the project database on your computer.
 
+`mkdir -p ~/SiameseNN_data`
+
+`cd ~/SiameseNN_data`
+
 Download the database sql file:
 `wget https://www.pmgenomics.ca/hoffmanlab/proj/SiameseNN/davide_dnase_hic_database_2018-03-08.sql`
 
@@ -48,7 +54,7 @@ Create the username `davide`:
 
 `psql`
 
-` CREATE USER davide WITH PASSWORD 'test' CREATEDB CREATEUSER;`
+` CREATE USER davide CREATEDB CREATEUSER;`
 
 ` \q`
 
@@ -63,7 +69,7 @@ Create the username `davide`:
 ` \q`
  
 Recover the database from the sql backup file:
-`psql davide < davide_dnase_hic_database_2018-03-08.sql`
+`psql davide < ~/SiameseNN_data/davide_dnase_hic_database_2018-03-08.sql`
  
 Edit the first lines of the *database_management.lua* file this way:
 
@@ -76,12 +82,12 @@ Edit the first lines of the *database_management.lua* file this way:
 `DB_ADDRESS = "localhost"`
 
 ## Software installation ##
-Clone this repository on your computer:
+Download or clone this repository on your computer:
 
 `hg clone https://davidechicco@bitbucket.org/hoffmanlab/siamesenn`
 
 ## Execution instructions ##
-Example script:
+Example execution script:
 
 `mkdir -p ../results`
 
