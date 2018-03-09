@@ -112,4 +112,5 @@ All the code is licensed under the [GNU General Public License, version 2 (GPLv2
 
 SiameseNN was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
 
-For questions regarding the software, please write to Davide Chicco at [<davidechicco@davidechicco.it>](mailto:davidechicco@davidechicco.it). For scientific questions, please write to Michael M. Hoffman at [<michael.hoffman@utoronto.ca>](mailto:michael.hoffman@utoronto.ca)
+For questions regarding the software, please write to Davide Chicco at <[davidechicco@davidechicco.it](mailto:davidechicco@davidechicco.it)>
+For scientific questions, please write to Michael M. Hoffman at <[michael.hoffman@utoronto.ca](mailto:michael.hoffman@utoronto.ca)>
