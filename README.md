@@ -37,6 +37,11 @@ To install PostgreSQL on Linux Ubuntu:
 
 `sudo apt-get -y install postgresql postgresql-contrib`
 
+## Software installation ##
+Download or clone this repository on your computer:
+
+`hg clone https://davidechicco@bitbucket.org/hoffmanlab/siamesenn`
+
 
 ## Database installation ##
 Here are the instructions to install the project database on your computer.
@@ -54,7 +59,7 @@ Create the username *davide*:
 
 `psql`
 
-` CREATE USER davide CREATEDB CREATEUSER;`
+` CREATE USER davide WITH PASSWORD 'test' CREATEDB CREATEUSER;`
 
 ` \q`
 
@@ -71,7 +76,7 @@ Create the username *davide*:
 Recover the database from the sql backup file:
 `psql davide < ~/SiameseNN_data/davide_dnase_hic_database_2018-03-08.sql`
  
-Edit the first lines of the *database_management.lua* file this way:
+Check the first lines of the *database_management.lua* file. They must be the following:
 
 `DB_NAME = "davide"`
 
@@ -81,13 +86,11 @@ Edit the first lines of the *database_management.lua* file this way:
 
 `DB_ADDRESS = "localhost"`
 
-## Software installation ##
-Download or clone this repository on your computer:
-
-`hg clone https://davidechicco@bitbucket.org/hoffmanlab/siamesenn`
 
 ## Execution instructions ##
 Example execution script:
+
+`cd siamesenn`
 
 `mkdir -p ../results`
 
