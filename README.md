@@ -1,14 +1,14 @@
-# SiameseNN - Computational prediction of chromatin long-range interactions #
+# Computational Hi-C - Computational prediction of chromatin long-range interactions #
 
-SiameseNN: Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from only DNase datasets
+Computational Hi-C: Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from only DNase datasets
 
 
 ## Summary ##
 Chromatin is the combination of DNA and proteins that form chromosomes within the nucleus of human cells, and has a significant role in gene expression. In gene expression, transcriptional regulation depends on physical interactions between enhancers and promoters, often not adjacent on the DNA backbone, but rather interacting in the folded 3D conformation of chromatin. Unfortunately, these 3D long-range interactions are not easy to find. Current molecular biology techniques such as chromosome conformation capture (3C) and Hi-C are too expensive for widespread use. To solve this problem, we propose a machine-learning approach based upon a siamese neural network model, previously used for the detection of forged hand-written signatures. This artificial neural network learns the mathematical representation of pairs of chromosome region DNase profiles and states whether they represent a long-range interaction. We tested the effectiveness of our method through a standard deep learning optimization approach, by validating our predicted interactions in a recent Hi-C dataset. Our method is not only able to predict long-range interactions from input dataset made of several cell types, but it is also able to effectively predict interactions for a cell type that is absent from the input dataset.
 
 ## Dependencies ##
-SiameseNN can be used on any Linux or macOS machine.
-To run SiameseNN, you need to have the following programs and packages installed in your machine:
+ComputationalHiC can be used on any Linux or macOS machine.
+To run ComputationalHiC, you need to have the following programs and packages installed in your machine:
 
 * **Torch** (version 7)
 * **PostgreSQL** 
@@ -40,7 +40,7 @@ To install PostgreSQL on Linux Ubuntu:
 ## Software installation ##
 Download or clone this repository on your computer:
 
-`hg clone https://davidechicco@bitbucket.org/hoffmanlab/siamesenn`
+`hg clone https://davidechicco@bitbucket.org/hoffmanlab/computationalhic`
 
 
 ## Database installation ##
@@ -90,7 +90,7 @@ Check the first lines of the *database_management.lua* file. They must be the fo
 ## Execution instructions ##
 Example execution script:
 
-`cd siamesenn`
+`cd computationalhic`
 
 `mkdir -p ../results`
 
@@ -105,7 +105,7 @@ All the code is licensed under the [GNU General Public License, version 2 (GPLv2
 
 ## Contacts and support ##
 
-SiameseNN was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
+Computational HiC was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
 
 For questions regarding the software, please write to Davide Chicco at <[davidechicco@davidechicco.it](mailto:davidechicco@davidechicco.it)>
 For scientific questions, please write to Michael M. Hoffman at <[michael.hoffman@utoronto.ca](mailto:michael.hoffman@utoronto.ca)>
