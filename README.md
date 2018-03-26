@@ -1,6 +1,6 @@
-# Computational Hi-C - Computational prediction of chromatin long-range interactions #
+# ComputationalHiC - Machine learning prediction of chromatin long-range interactions #
 
-Computational Hi-C: Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from only DNase datasets
+ComputationalHiC: Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from only DNase datasets
 
 
 ## Summary ##
