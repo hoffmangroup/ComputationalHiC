@@ -46,12 +46,12 @@ Download or clone this repository on your computer:
 ## Database installation ##
 Here are the instructions to install the project database on your computer.
 
-`mkdir -p ~/SiameseNN_data`
+`mkdir -p computationalhic/data`
 
-`cd ~/SiameseNN_data`
+`cd computationalhic/data`
 
 Download the database sql file:
-`wget https://www.pmgenomics.ca/hoffmanlab/proj/SiameseNN/davide_dnase_hic_database_2018-03-08.sql`
+`wget https://www.pmgenomics.ca/hoffmanlab/proj/computationalhic/computationalhic_database_no_owner_2018-07-10.sql`
 
 Create the username *davide*:
 
@@ -74,15 +74,15 @@ Create the username *davide*:
 ` \q`
  
 Recover the database from the sql backup file:
-`psql davide < ~/SiameseNN_data/davide_dnase_hic_database_2018-03-08.sql`
+`psql davide < computationalhic/data/computationalhic_database_no_owner_2018-07-10.sql`
  
 Check the first lines of the *database_management.lua* file. They must be the following:
 
-`DB_NAME = "davide"`
+`DB_NAME = "database_2018_07_12"`
 
-`DB_USER = "davide"`
+`DB_USER = "YOUR_POSTGRESQL_USERNAME"`
 
-`DB_PWD = "test"`
+`DB_PWD = "YOUR_POSTGRESQL_PASSWORD"`
 
 `DB_ADDRESS = "localhost"`
 
