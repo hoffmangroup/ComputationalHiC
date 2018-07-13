@@ -84,7 +84,7 @@ Example execution script:
 ## Citation ##
 When using ComputationalHiC, please cite the following paper:
 
-`Davide Chicco, Michael M. Hoffman, "Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from DNase alone", 2018. *In preparation.*`
+> Davide Chicco, Michael M. Hoffman, "Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from DNase alone", 2018. *In preparation.*`
 
 ## License ##
 All the code is licensed under the [GNU General Public License, version 2 (GPLv2)](http://www.gnu.org/licenses/gpl-2.0-standalone.html).
