@@ -37,6 +37,8 @@ To install PostgreSQL on Linux Ubuntu:
 
 `sudo apt-get -y install postgresql postgresql-contrib`
 
+During the installation of postgresql on your computer, you set a username and a password, that here we will call `YOUR_POSTGRESQL_USERNAME` and `YOUR_POSTGRESQL_PASSWORD`.
+
 ## Software installation ##
 Download or clone this repository on your computer:
 
@@ -46,16 +48,16 @@ Download or clone this repository on your computer:
 ## Database installation ##
 Here are the instructions to install the project database on your computer.
 
-`mkdir -p computationalhic/data`
+`mkdir -p ~/computationalhic/data`
 
-`cd computationalhic/data`
+`cd ~/computationalhic/data`
 
 Download the database sql file:
 `wget https://www.pmgenomics.ca/hoffmanlab/proj/computationalhic/computationalhic_database_no_owner_2018-07-10.sql`
 
  
 Recover the database from the sql backup file:
-`psql davide < computationalhic/data/computationalhic_database_no_owner_2018-07-10.sql`
+`psql YOUR_POSTGRESQL_USERNAME < computationalhic/data/computationalhic_database_no_owner_2018-07-10.sql`
  
 Check the first lines of the *database_management.lua* file. They must be the following:
 
