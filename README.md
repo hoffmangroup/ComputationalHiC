@@ -81,13 +81,16 @@ Example execution script:
 
 `th siamese_nn_toy.lua prediction 200 chrX 2699320 154917490 50 -1 ../results/2018-03-09_multi_cell_test_k562_20000elems/chrX_train_complete-2699320-154917490_test_k562_20000elems_bal_96542rand SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL ./models/chrX_trained_model_k562_20000elems_bal_96542rand false 2699320 154917490 200 90 -1 -1 true 20 -1 k562 -1 -1 -1 false GM12878 HUVEC IMR90 -1`
 
+## Citation ##
+When using ComputationalHiC, please cite the following paper:
+
+`Davide Chicco, Michael M. Hoffman, "Siamese neural networks for prediction of cell type specific long-range interactions in chromatin from DNase alone", 2018. *In preparation.*`
 
 ## License ##
 All the code is licensed under the [GNU General Public License, version 2 (GPLv2)](http://www.gnu.org/licenses/gpl-2.0-standalone.html).
 
 
 ## Contacts and support ##
-
 Computational HiC was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
 
 For questions regarding the software, please write to Davide Chicco at <[davidechicco@davidechicco.it](mailto:davidechicco@davidechicco.it)>
