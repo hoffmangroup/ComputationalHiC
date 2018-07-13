@@ -53,25 +53,6 @@ Here are the instructions to install the project database on your computer.
 Download the database sql file:
 `wget https://www.pmgenomics.ca/hoffmanlab/proj/computationalhic/computationalhic_database_no_owner_2018-07-10.sql`
 
-Create the username *davide*:
-
-`sudo su - postgres`
-
-`psql`
-
-` CREATE USER davide WITH PASSWORD 'test' CREATEDB CREATEUSER;`
-
-` \q`
-
-` exit`
- 
- Create the database *davide*:
- 
-`psql -d postgres -U davide`
-
-` CREATE DATABASE davide;`
-
-` \q`
  
 Recover the database from the sql backup file:
 `psql davide < computationalhic/data/computationalhic_database_no_owner_2018-07-10.sql`
