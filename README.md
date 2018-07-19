@@ -53,7 +53,7 @@ Here are the instructions to install the project database on your computer.
 `cd ~/computationalhic/data`
 
 Download the database sql file:
-`wget https://www.pmgenomics.ca/hoffmanlab/proj/computationalhic/computationalhic_database_no_owner_2018-07-10.sql`
+`wget https://comphic.hoffmanlab.org/computationalhic_database_no_owner_2018-07-10.sql`
 
  
 Recover the database from the sql backup file:
@@ -88,7 +88,6 @@ When using ComputationalHiC, please cite the following paper:
 
 ## License ##
 All the code is licensed under the [GNU General Public License, version 2 (GPLv2)](http://www.gnu.org/licenses/gpl-2.0-standalone.html).
-
 
 ## Contacts and support ##
 Computational HiC was developed by [Davide Chicco](http://www.DavideChicco.it) and [Michael M. Hoffman](http://www.hoffmanlab.org) at the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research/) (Toronto, Ontario, Canada).
