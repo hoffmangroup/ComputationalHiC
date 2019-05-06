@@ -19,15 +19,25 @@ profi_flag="false"
 ## k562 -> 61
 ## GM12878 -> 26 (GM12865)
 
-trainingSetCellTypeName1="GM12878"
-trainingSetCellTypeName2="HUVEC"
-trainingSetCellTypeName3="IMR90"
+trainingSetCellTypeName1="HUVEC"
+trainingSetCellTypeName2="IMR90"
+trainingSetCellTypeName3="k562"
 trainingSetCellTypeName4="-1"
 
-hicCellTypeNameValidSet1="k562"
+hicCellTypeNameValidSet1="GM12878"
 hicCellTypeNameValidSet2="-1"
 hicCellTypeNameValidSet3="-1"
 hicCellTypeNameValidSet4="-1"
+
+# trainingSetCellTypeName1="-1"
+# trainingSetCellTypeName2="-1"
+# trainingSetCellTypeName3="-1"
+# trainingSetCellTypeName4="-1"
+# 
+# hicCellTypeNameValidSet1="-1"
+# hicCellTypeNameValidSet2="-1"
+# hicCellTypeNameValidSet3="-1"
+# hicCellTypeNameValidSet4="-1"
 
 
 today=`date +%Y-%m-%d`
@@ -47,9 +57,8 @@ balancedFalsePerc=50
 training_sample_perc=-1
 retrieveFP_flag_ini="false"
 
-mkdir -p "./models"
-
-folder="../results/"$today"_multi_cell_test_"${hicCellTypeNameValidSet1}"_"${tupleLimit}"elems"/
+folder="../results/"$today"_multi_cell_test_splitTrainTest"${hicCellTypeNameValidSet1}""/
+# folder="../results/"$today"_multi_cell_test_splitTrainTest_ALL_CELL_TYPE"/
 mkdir -p $folder
 
 i=1
@@ -57,11 +66,16 @@ for i in $(seq $((${#indexStartVector[@]} - 1)))
 do
 
 
-#   if [ "$i" -ne 1 ] && [ "$i" -ne 2 ]  && [ "$i" -ne 3 ]  && [ "$i" -ne 7 ]  && [ "$i" -ne 12 ]  && [ "$i" -ne 14 ] && [ "$i" -ne 16 ] && [ "$i" -ne 19 ] && [ "$i" -ne 20 ] 
-#   then 
+   # trainStart=${indexStartVector[$i-1]} #  original
+   # trainEnd=${indexEndVector[$i-1]} # original
    
-   trainStart=${indexStartVector[$i-1]}
-   trainEnd=${indexEndVector[$i-1]}
+   initialLocus=${indexStartVector[$i-1]}
+   finalLocus=${indexEndVector[$i-1]}
+   
+   testStart=$initialLocus
+   testEnd=$((finalLocus/2))
+   trainStart=$((testEnd+1))
+   trainEnd=$finalLocus
 
    chrNum="chr"${i}
    # chrNum="chr0"
@@ -73,15 +87,23 @@ do
 
 #   qsub -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua  prediction  $tupleLimit  $chrNum  $trainStart  $trainEnd  50  -1  $outputFile  $execution  $modelFile  false  $trainStart  $trainEnd  2000  90  -1  -1  true  20 $dnaseColNumToExclude $hicCellTypeNameValidSet1 $hicCellTypeNumberToHighlight $profi_flag $trainingSetCellTypeName1 > $outputFile 2> $outputFile
 
-  echo -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
+  qsub -q hoffmangroup  -l 'h=!n23vm1' -l mem_requested=${mem_size}G -N ${hicCellTypeNameValidSet1}${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini $testStart  $testEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
 
 
 done
 
 i=23
 chrNum="chrX"
-trainStart=${indexStartVector[$i-1]}
-trainEnd=${indexEndVector[$i-1]}  
+# trainStart=${indexStartVector[$i-1]}
+# trainEnd=${indexEndVector[$i-1]}  
+
+initialLocus=${indexStartVector[$i-1]}
+finalLocus=${indexEndVector[$i-1]}
+   
+trainStart=$initialLocus
+trainEnd=$((finalLocus/2))
+testStart=$((trainEnd+1))
+testEnd=$finalLocus
 
 random_number=$(shuf -i1-100000 -n1)
 
@@ -90,7 +112,7 @@ outputFile=${folder}${chrNum}_train_complete-${trainStart}-${trainEnd}_test_${hi
 modelFile="./models/${chrNum}_trained_model_"${hicCellTypeNameValidSet1}"_${tupleLimit}elems_bal_${random_number}rand"
 
 
-echo -q hoffmangroup  -l mem_requested=${mem_size}G -N ${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $trainStart  $trainEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
+qsub -q hoffmangroup  -l 'h=!n23vm1'  -l mem_requested=${mem_size}G -N ${hicCellTypeNameValidSet1}${chrNum}_job${random_number} -cwd -b y -o $outputFile -e $outputFile th siamese_nn_toy.lua prediction $tupleLimit  $chrNum  $trainStart  $trainEnd  $balancedFalsePerc  $training_sample_perc  $outputFile  $execution  $modelFile  $retrieveFP_flag_ini  $testStart  $testEnd $testTupleLimit 90 -1 -1 true 20 -1 $hicCellTypeNameValidSet1 $hicCellTypeNameValidSet2 $hicCellTypeNameValidSet3 $hicCellTypeNameValidSet4 $profi_flag $trainingSetCellTypeName1 $trainingSetCellTypeName2 $trainingSetCellTypeName3 $trainingSetCellTypeName4 > $outputFile 2> $outputFile
 
 # # on all the chromosomes
 # 

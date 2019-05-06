@@ -34,7 +34,7 @@ XAVIER_INITIALIZATION = false;
 MOMENTUM_FLAG = true;
 MOMENTUM_ALPHA = 0.5;
 PRINT_NOT_REG_CELL_TYPE_ONCE = false;
-ITERATIONS_CONST = 1000; -- ******** 1000 **********
+ITERATIONS_CONST = 5000; -- ******** 1000 **********
 LEARNING_RATE_CONST = 0.001; -- ******** 0.001 **********
 MAX_POSSIBLE_MSE = 4;
 CELL_TYPE_NUMBER = 82;
@@ -46,6 +46,8 @@ SCORE_UNDEF = -2
 HIGHLIGHT_NEURON_WEIGHT_1ST_CELL_TYPE = false
 
 NEW_ARCHITECTURE = true -- new architecture with the doubling of the neurons
+
+DEC_NUM = 3
 
 require 'optim'
 -- require '../../torch/NEW_CosineDistance.lua'
@@ -744,8 +746,8 @@ function siameseNeuralNetwork_application(first_datasetTrain, second_datasetTrai
    local testModelOutput = testModel(first_datasetTest, second_datasetTest, targetDatasetTest, generalPerceptron)	    
    printTime(time_testing, "Testing duration ");
 
-   local thisAccuracy = round(testModelOutput[1],2);
-   local thisMCC = signedValueFunction(round(testModelOutput[3],2));
+   local thisAccuracy = round(testModelOutput[1],DEC_NUM);
+   local thisMCC = signedValueFunction(round(testModelOutput[3],DEC_NUM));
    if tonumber(thisMCC) < -1 then thisMCC="Not"; end
    if thisAccuracy < -1 then thisAccuracy="Not"; end
    architectureLabel = architectureLabel.."_Mcc"..tostring(thisMCC).."_accuracy"..tostring(thisAccuracy)
@@ -1319,13 +1321,13 @@ print("TOTAL:")
   
   accuracy = (tp + tn)/(tp + tn +fn + fp)
 -- ######## Line too long (109 chars) ######## :
-  print(" accuracy = "..round(accuracy,2).. " = (tp + tn)/(tp + tn +fn + fp) \t  \t [worst = 0, best =  1]");
+  print(" accuracy = "..round(accuracy,DEC_NUM).. " = (tp + tn)/(tp + tn +fn + fp) \t  \t [worst = 0, best =  1]");
   
   local f1_score = SCORE_UNDEF
   if (tp+fp+fn)>0 then   
   f1_score = (2*tp) / (2*tp+fp+fn)
 -- ######## Line too long (95 chars) ######## :
-  print("f1_score = "..round(f1_score,2).." = (2*tp) / (2*tp+fp+fn) \t [worst = 0, best = 1]");
+  print("f1_score = "..round(f1_score,DEC_NUM).." = (2*tp) / (2*tp+fp+fn) \t [worst = 0, best = 1]");
   else
   print("f1_score CANNOT be computed because (tp+fp+fn)==0")    
   end
@@ -1334,40 +1336,34 @@ print("TOTAL:")
   if (fp+tp)>0 then 
   false_discovery_rate = fp / (fp + tp)
 -- ######## Line too long (111 chars) ######## :
-  print("false_discovery_rate = "..round(false_discovery_rate,2).." = fp / (fp + tp) \t [worst = 1, best = 0]")
+  -- print("false_discovery_rate = "..round(false_discovery_rate,DEC_NUM).." = fp / (fp + tp) \t [worst = 1, best = 0]")
   end
   
   local precision = SCORE_UNDEF
   if (tp+fp)>0 then
   precision = tp/(tp+fp)
 -- ######## Line too long (89 chars) ######## :
-  print("precision = "..round(precision,2).." = tp / (tp + fp) \t [worst = 0, best = 1]")
+  -- print("precision = "..round(precision,DEC_NUM).." = tp / (tp + fp) \t [worst = 0, best = 1]")
   end
   
   local recall = SCORE_UNDEF
   if (tp+fn)>0 then
   recall = tp/(tp+fn)
 -- ######## Line too long (83 chars) ######## :
-  print("recall = "..round(recall,2).." = tp / (tp + fn) \t [worst = 0, best = 1]")
+  print("true positive rate = recall = "..round(recall,DEC_NUM).." = tp / (tp + fn) \t [worst = 0, best = 1]")
+  end
+  
+  local specificity = SCORE_UNDEF
+  if (tn + fp)>0 then
+  specificity =  tn / (tn + fp)
+-- ######## Line too long (83 chars) ######## :
+  print("true negative rate = specificity = "..round(specificity,DEC_NUM).." = tn / (tn + fp) \t [worst = 0, best = 1]")
   end
   
   local numberOfPredictedOnes = tp + fp;
 -- ######## Line too long (158 chars) ######## :
  -- print("\n\nnumberOfPredictedOnes = (TP + FP) = "..comma_value(numberOfPredictedOnes).." = "..round(numberOfPredictedOnes*100/(tp + tn + fn + fp),2).."%");
-  
-  io.write("\nDiagnosis: ");
-  if (fn >= tp and (fn+tp)>0) then print("too many FN false negatives"); end
-  if (fp >= tn and (fp+tn)>0) then print("too many FP false positives"); end
-  
-  
-  if (tn > (10*fp) and tp > (10*fn)) then print("Excellent ! ! !");
-  elseif (tn > (5*fp) and tp > (5*fn)) then print("Very good ! !"); 
-  elseif (tn > (2*fp) and tp > (2*fn)) then print("Good !"); 
-  elseif (tn > fp and tp > fn) then print("Alright"); 
-  elseif (tn > fp and tp < fn) then print("Okay");
-  elseif (tn < fp and tp > fn) then print("Okay"); 
-  elseif checkAllZeros(truthVect)==false then print("Baaaad"); end
- end
+end  
  
  return {accuracy, arrayFPindices, arrayFPvalues, MatthewsCC};
 end
@@ -1446,7 +1442,7 @@ function gradientUpdateMinibatch(generalPerceptron, dataset_vector, targetVector
   mseSum = mseSum + mseVect[p];
   
 -- ######## Line too long (162 chars) ######## :
-  io.write("(p="..p..") normPredictionValue["..p.."] = "..round(normPredictionValue[p],2).."\t normTargetVector["..p.."] = "..round(normTargetVector[p],2).."\t");
+  io.write("(p="..p..") normPredictionValue["..p.."] = "..round(normPredictionValue[p],DEC_NUM).."\t normTargetVector["..p.."] = "..round(normTargetVector[p],2).."\t");
 -- ######## Line too long (90 chars) ######## :
   entroErrorVect[p] = -(math.log(normPredictionValue[p])*normTargetVector[p]); -- TO CHECK
  --  print("entroErrorVect["..p.."] = "..round(entroErrorVect[p]));
@@ -1503,7 +1499,7 @@ function gradientUpdateReg(generalPerceptron, input_profile, targetValue, learni
 -- ######## Line too long (138 chars) ######## :
   io.write("(ite="..ite..") (ele="..i..") pred = "..signedValueFunction(predictionValue).." target = "..signedValueFunction(targetValue));
 -- ######## Line too long (114 chars) ######## :
-  io.write(" => totalError = "..round(totalError,3).." = "..round(meanSquareError,3).." + "..round(regPenalty,3));
+  io.write(" => totalError = "..round(totalError,DEC_NUM).." = "..round(meanSquareError,DEC_NUM).." + "..round(regPenalty,DEC_NUM));
   
   io.write("\n");
   io.flush();
@@ -1546,7 +1542,7 @@ function gradientUpdate(generalPerceptron, input_profile, targetValue, learningR
   
  if ite == iterations_number then
 -- ######## Line too long (98 chars) ######## :
-  print("mseSum = mseSum + meanSquareError = "..round(mseSum,2).." + "..round(meanSquareError,2));
+  print("mseSum = mseSum + meanSquareError = "..round(mseSum,DEC_NUM).." + "..round(meanSquareError,DEC_NUM));
  end
   
  -- it's 50 because the error goes from 0 to 4
@@ -1611,9 +1607,9 @@ io.flush();
 
 
 local label = tostring(arg[1]);
-print("Test label = "..label);
+print("Execution label = "..label);
 local tuple_limit = tonumber(arg[2]);
-print("tuple_limit = "..tuple_limit);
+print("training set size requested (tuple_limit) = "..tuple_limit);
 local locus_position_limit = 500000
 local balancedFlag = false
 local chromSel = tostring(arg[3]);
@@ -1664,7 +1660,7 @@ val_balancedFalsePerc = tonumber(arg[15])
   
 -- ######## Line too long (96 chars) ######## :
 print("validation segment: "..chromSel.." from "..val_chrStart_locus.." to "..val_chrEnd_locus);
-print("val_tuple_limit = "..val_tuple_limit);
+print("validation set size requested (val_tuple_limit) = "..val_tuple_limit);
 print("val_balancedFalsePerc = "..val_balancedFalsePerc.."%");
 
 
@@ -1853,6 +1849,10 @@ local balancedDatasetSize = unbal_data_read_output[1];
 -- print("balancedDatasetSize ".. comma_value(balancedDatasetSize));
 dnaseDataTable = unbal_data_read_output[2]; -- dnaseDataTable is the unbalanced test set
 
+
+print("\ntraining set #dnaseDataTable = "..comma_value(#dnaseDataTable));
+trainingSetActualSize = #dnaseDataTable
+
 dnaseDataTable_only_IDs_training = unbal_data_read_output[8];
   
  if balancedDatasetSize==0 then
@@ -1897,6 +1897,10 @@ if execution == "OPTIMIZATION-TRAINING-HELD-OUT-DISTAL" or execution == "OPTIMIZ
   
   -- In the training set, we read interactions of the hicCellTypeTrainingSet cell type and avoided hicCellTypeValidSet cell types
   -- Now in the test set, we do the opposite
+  
+  print("\n\n We change the requested validation size here: the new validation size (val_tuple_limit) must be 20% of the actual training set size\n")
+  val_tuple_limit = round(trainingSetActualSize *20/100, 0)
+  print("The new requested validation size is "..val_tuple_limit.."\n")
  
   -- previous (one cell type):
   -- local val_dataset_output = readDataThroughPostgreSQL_segment(chromSel, val_tuple_limit, locus_position_limit, balancedFlag, val_chrStart_locus, val_chrEnd_locus, execution, CELL_TYPE_NUMBER, dataSource, val_balancedFalsePerc, val_uniformDistribution, dnaseExcludeColumn, hicCellTypeTrainingSet, hicCellTypeValidSet)
@@ -2202,8 +2206,8 @@ for hiddenLayers=1,maxHiddenLayers do
     
     local currentMCC = applicationOutput[3]
     local currentAccuracy = applicationOutput[1]
-    io.write("currentMCC = "..signedValueFunction(round(currentMCC,3)));
-    io.write(" currentAccuracy = "..round(currentAccuracy,3));
+    io.write("currentMCC = "..signedValueFunction(round(currentMCC,DEC_NUM)));
+    io.write(" currentAccuracy = "..round(currentAccuracy,DEC_NUM));
     io.write(" hiddenUnits = "..hiddenUnits);
     io.write(" hiddenLayers = "..hiddenLayers.."\n");
     io.flush();
@@ -2263,8 +2267,7 @@ for hiddenLayers=1,maxHiddenLayers do
   vectorMCC[#vectorMCC+1] = output_confusion_matrix[4]
   printVector(vectorAccuracy, "PARTIAL vectorAccuracy")
   printVector(vectorMCC, "PARTIAL vectorMCC")
-  
--- ######## Line too long (99 chars) ######## :
+
   local stopCondition = continueOrStopCheck(output_confusion_matrix[1], output_confusion_matrix[4])
 
   if stopCondition==true then break; end  
@@ -2315,8 +2318,8 @@ elseif execution == "SINGLE-MODEL-TRAINING-HELD-OUT-DISTAL"  then
   
   local currentMCC = applicationOutput[3]
   local currentAccuracy = applicationOutput[1]
-  io.write("currentMCC = "..round(currentMCC,2));
-  io.write(" currentAccuracy = "..round(currentAccuracy,3));
+  io.write("currentMCC = "..round(currentMCC,DEC_NUM));
+  io.write(" currentAccuracy = "..round(currentAccuracy,DEC_NUM));
 
   io.write(" hiddenUnits = "..hiddenUnits);
   io.write(" hiddenLayers = "..hiddenLayers.."\n");

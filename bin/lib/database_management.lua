@@ -1834,7 +1834,7 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
 	end
 	
       print("\n#dnaseDataTable = "..comma_value(#dnaseDataTable));
-      print("\n#dnaseDataTable_length = ".. comma_value(dnaseDataTable_length));      
+      print("\ndnaseDataTable_length = ".. comma_value(dnaseDataTable_length));      
       if #dnaseDataTable~=dnaseDataTable_length then print("Dimension error because of #dnaseDataTable~=dnaseDataTable_length.\n The program will stop."); os.exit(); end
 
       if #dnaseDataTable == 0 then 
@@ -1851,7 +1851,7 @@ function readDataThroughPostgreSQL_segment(chromSel, tuple_limit, locus_position
       if NEW_ARCHITECTURE == false then
       	return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs};
       else
-	return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs, dataset_firstChromRegion_newArchi, dataset_secondChromRegion_newArchi};
+        return {lengthTrues, dnaseDataTable, dataset_firstChromRegion, dataset_secondChromRegion, targetVector, completeTable, dataset, dnaseDataTable_only_IDs, dataset_firstChromRegion_newArchi, dataset_secondChromRegion_newArchi};
       end
 end
 
